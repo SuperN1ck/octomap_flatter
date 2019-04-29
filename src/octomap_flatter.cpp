@@ -9,15 +9,20 @@ OctomapFlatter::OctomapFlatter(ros::NodeHandle &nh, ros::NodeHandle &nh_private)
     nh_private_(nh_private),
     octomap_sub_(nh, "/octomap_full", 1),
     projected_map_sub_(nh, "/projected_map", 1),
-    synchronizer_(SyncPolicy(10), octomap_sub_, projected_map_sub_)
+    synchronizer_(SyncPolicy(10), octomap_sub_, projected_map_sub_),
+    config_()
 {
     /* Start Tracking */
-    connection = synchronizer_.registerCallback(boost::bind(&OctomapFlatter::octomapCallback, this, _1, _2));
-
+    /* In */
+    connection_ = synchronizer_.registerCallback(boost::bind(&OctomapFlatter::octomapCallback, this, _1, _2));
+    /* Out */
     octomap_pub_ = nh.advertise<octomap_msgs::Octomap>("/octomap_flattened", 1);
+    /* Parameters */
+    dynamic_reconfigure::Server<octomap_flatter::OctoFlatterConfig>::CallbackType f;
+    f = boost::bind(&OctomapFlatter::dynamicParameterCallback, this, _1, _2);
+    param_server_.setCallback(f);
+
     ROS_INFO("started octomap_flatter ...");
-    // synchronizer_(RGBDWithCameraInfoPolicy(5), rgb_image_subscriber_, depth_image_subscriber_, rgb_camera_info_subscriber_, depth_camera_info_subscriber_),
-    // connection = synchronizer_.registerCallback(boost::bind(&CameraBase::handleImages, this, _1, _2, _3, _4));
 }
 
 void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octomap_msg,
@@ -43,40 +48,47 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
 
     for (octomap::ColorOcTree::leaf_iterator it = m_octomap->begin_leafs(), end = m_octomap->end_leafs(); it != end; ++it)
     {
-        // //manipulate node, e.g.:
+        // Access various node proprertie e.g.:
         // std::cout << "Node center: " << it.getCoordinate() << std::endl;
         // std::cout << "Node size: " << it.getSize() << std::endl;
         // std::cout << "Node value: " << it->getValue() << std::endl;
         octomap::point3d coord = it.getCoordinate();
 
-        if (coord.z() > min_Z + 0.03)
+        if (coord.z() > min_Z + config_.height_threshold)
             continue;
 
-        /* This should clear the whole tree */
         octomap::OcTreeKey key = it.getKey();
         // ROS_INFO_STREAM("Key: " << key[0] << " " << key[1] << " " << key[2]);
+        /* Delete current node */
         m_octomap->deleteNode(key);
-        // ROS_INFO_STREAM("Publishing tree with " << m_octomap->calcNumNodes() << " nodes");
-        // continue;
 
         // ROS_INFO_STREAM("Old coordinate: " << coord);
-        // m_octomap->updateNode(key, false, true);
+        // m_octomap->updateNode(key, false, true); // This didn't worked
+        /* Push Node to ground */
         coord.z() = min_Z;
-        // ROS_INFO_STREAM("New coordinate: " << coord);
+        /* Set it filled */
         m_octomap->updateNode(coord, true, true);
     }
 
     m_octomap->updateInnerOccupancy();
     m_octomap->toMaxLikelihood();
     m_octomap->prune();
+    /* Create Message */
     octomap_msgs::Octomap out_msg;
     octomap_msgs::fullMapToMsg(*m_octomap, out_msg);
     out_msg.header = octomap_msg->header;
-    // out_msg.header.stamp = ros::Time::now();
+    // out_msg.header.stamp = ros::Time::now(); // This creates the new octomap at the new timestamp
 
     /* Publish & Clean up */
     ROS_INFO_STREAM("Publishing tree with " << m_octomap->calcNumNodes() << " nodes");
     octomap_pub_.publish(out_msg);
     delete m_octomap;
 }
+
+void OctomapFlatter::dynamicParameterCallback(octomap_flatter::OctoFlatterConfig &config, uint32_t level)
+{
+    config_ = config;
+}
+
+
 } // namespace octflat
