@@ -7,13 +7,17 @@ add_compile_options(-std=c++11)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS roscpp)
+find_package(catkin REQUIRED COMPONENTS roscpp octomap_msgs message_filters)
 find_package(cmake_modules REQUIRED)
 
+# Octomap
+find_package(octomap 1.6 REQUIRED)
+include_directories(SYSTEM BEFORE ${OCTOMAP_INCLUDE_DIRS})
+link_directories(${OCTOMAP_LIBRARY_DIRS})
+link_libraries(${OCTOMAP_LIBRARIES})
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -123,6 +127,10 @@ add_library(${PROJECT_NAME}
    src/octomap_flatter.cpp
 )
 
+target_link_libraries(${PROJECT_NAME}
+   ${catkin_LIBRARIES}
+)
+
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
@@ -145,7 +153,6 @@ add_executable(${PROJECT_NAME}_node src/octomap_flatter_node.cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(${PROJECT_NAME}_node
-   ${catkin_LIBRARIES}
    ${PROJECT_NAME}
 )
 

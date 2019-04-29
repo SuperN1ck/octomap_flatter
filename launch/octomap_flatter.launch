@@ -1,4 +1,7 @@
 <launch>
+
+  <include file="$(find octomap_flatter)/launch/octomap.launch" />
+
   <node pkg="octomap_flatter" type="octomap_flatter_node" name="octomap_flatter" output="screen">
         <!-- Params go here -->
   </node>

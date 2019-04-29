@@ -52,8 +52,9 @@
   <buildtool_depend>catkin</buildtool_depend>
 
   <depend>roscpp</depend>
-
-
+  <depend>octomap_msgs</depend>
+  <depend>octomap</depend>
+  <depend>message_filters</depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

@@ -22,5 +22,6 @@ int main(int argc, char **argv) {
     // spinner.spin();
     ros::spin();
 
+    ROS_INFO("Hello");
     return 0;
 }
