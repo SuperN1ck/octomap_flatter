@@ -13,6 +13,9 @@
 #include <dynamic_reconfigure/server.h>
 #include <octomap_flatter/OctoFlatterConfig.h>
 
+#include <tf/transform_listener.h>
+
+
 namespace octflat
 {
 typedef message_filters::sync_policies::ApproximateTime<octomap_msgs::Octomap,
@@ -25,6 +28,7 @@ class OctomapFlatter
 private:
     ros::NodeHandle nh_;
     ros::NodeHandle nh_private_;
+    tf::TransformListener transform_listener_;
 
     /* In */
     message_filters::Subscriber<octomap_msgs::Octomap> octomap_sub_;
@@ -35,6 +39,7 @@ private:
                          const nav_msgs::OccupancyGrid::ConstPtr &occupancy_grid_msg);
     /* Out */
     ros::Publisher octomap_pub_;
+    // ros::Publisher bounding_box_pub_;
     /* Parameters */
     octomap_flatter::OctoFlatterConfig config_;
     dynamic_reconfigure::Server<octomap_flatter::OctoFlatterConfig> param_server_;
