@@ -90,72 +90,23 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     double flattening_width = 1.0;
     double flattening_height = 2.0;
 
-    /* Calculate box that captures desired view in world frame because we got the previous transform in world frame */
-    /* Wrong Method? */
-    // if (yaw < 0)
-    // {
-    //     yaw = 90 + yaw; // --> 90 + (-20) = 70
-    // }
-
-    // ROS_INFO_STREAM("Yaw: " << yaw);
-
-    // double a_1 = cos(yaw) * flattening_width;
-    // double a_2 = sin(yaw) * flattening_height;
-    // double b_1 = cos(yaw) * flattening_height;
-    // double b_2 = sin(yaw) * flattening_width;
-
-    // ROS_INFO_STREAM("a_1: " << a_1 << " a_2: " << a_2 << " b_1: " << b_1 << " b_2: " << b_2);
-
-    // double x_length = a_1 + a_2;
-    // double y_length = b_1 + b_2;
-
-    // double x_origin = v.getX() + a_2;
-    // double y_origin = v.getY() - b_2 / 2;
-
-    // ROS_INFO_STREAM("x_origin: " << x_origin << " y_origin: " << y_origin);
-
-    // octomap::point3d start_box(x_origin, y_origin, min_Z);
-    // octomap::point3d end_box(x_origin - x_length, y_origin + y_length, v.getZ());
-
-    /* Better Method */
-    // std::vector<tf::Vector3> box_corners{tf::Vector3(v.getX(), v.getY() + flattening_width / 2, 0),
-    //                                       tf::Vector3(v.getX(), v.getY() - flattening_width / 2, 0),
-    //                                       tf::Vector3(v.getX() + flattening_height, v.getY() + flattening_width / 2, 0),
-    //                                       tf::Vector3(v.getX() + flattening_height, v.getY() - flattening_width / 2, 0)};
+    tf::Vector3 z_axis(0., 0., 1.);
+    tf::Vector3 pt1 = v + tf::Vector3(0.0, flattening_width/2, 0.0).rotate(z_axis, yaw);
+    tf::Vector3 pt2 = v + tf::Vector3(0.0, -flattening_width/2, 0.0).rotate(z_axis, yaw);
+    tf::Vector3 pt3 = v + tf::Vector3(flattening_height, flattening_width/2, 0.0).rotate(z_axis, yaw);
+    tf::Vector3 pt4 = v + tf::Vector3(flattening_height, -flattening_width/2, 0.0).rotate(z_axis, yaw);
     
-    // for (tf::Vector3 point : box_corners)
-    // {
-    //     ROS_INFO_STREAM("Before rotating: " << point);
-    //     point = point.rotate(tf::Vector3(0., 0., 1.), yaw);
-    //     ROS_INFO_STREAM("After rotating: " << point);
-    //     x_min = std::min(point.getX(), x_min);
-    //     x_max = std::max(point.getX(), x_max);
-    //     y_min = std::min(point.getY(), y_min);
-    //     y_max = std::max(point.getY(), y_max);
-    // }
-
-    /* Even Better Method */
-    tf::Vector3 pt1 = v + tf::Vector3(0.0, flattening_width/2, 0.0).rotate(tf::Vector3(0., 0., 1.), yaw);
-    tf::Vector3 pt2 = v + tf::Vector3(0.0, -flattening_width/2, 0.0).rotate(tf::Vector3(0., 0., 1.), yaw);
-    tf::Vector3 pt3 = v + tf::Vector3(flattening_height, flattening_width/2, 0.0).rotate(tf::Vector3(0., 0., 1.), yaw);
-    tf::Vector3 pt4 = v + tf::Vector3(flattening_height, -flattening_width/2, 0.0).rotate(tf::Vector3(0., 0., 1.), yaw);
-    
-    double x_min = std::numeric_limits<double>::max();
-    double x_max = std::numeric_limits<double>::min();
-    double y_min = std::numeric_limits<double>::max();
-    double y_max = std::numeric_limits<double>::min();
-
-    x_min = std::min({pt1.getX(),pt2.getX(),pt3.getX(),pt4.getX()});
-    x_max = std::max({pt1.getX(),pt2.getX(),pt3.getX(),pt4.getX()});
-    y_min = std::min({pt1.getY(),pt2.getY(),pt3.getY(),pt4.getY()});
-    y_max = std::max({pt1.getY(),pt2.getY(),pt3.getY(),pt4.getY()});
+    double x_min = std::min({pt1.getX(),pt2.getX(),pt3.getX(),pt4.getX()});
+    double x_max = std::max({pt1.getX(),pt2.getX(),pt3.getX(),pt4.getX()});
+    double y_min = std::min({pt1.getY(),pt2.getY(),pt3.getY(),pt4.getY()});
+    double y_max = std::max({pt1.getY(),pt2.getY(),pt3.getY(),pt4.getY()});
 
     octomap::point3d start_box(x_min, y_min, min_Z);
     octomap::point3d end_box(x_max, y_max, v.getZ());
 
     ROS_INFO_STREAM("Bounding box: (" << x_min << ", " << y_min << ") --> (" << x_max << ", " << y_max << ")");
 
-    publish_bounding_box(start_box, end_box);
+    publish_bounding_box(start_box, end_box, octomap_msg->header.stamp);
 
     /* Create data array */
     // TODO Check for correct frame direction
@@ -235,12 +186,12 @@ void OctomapFlatter::dynamicParameterCallback(octomap_flatter::OctoFlatterConfig
     config_ = config;
 }
 
-void OctomapFlatter::publish_bounding_box(octomap::point3d start_box, octomap::point3d end_box)
+void OctomapFlatter::publish_bounding_box(octomap::point3d start_box, octomap::point3d end_box, ros::Time time_stamp)
 {
     visualization_msgs::Marker marker;
     // Set the frame ID and timestamp.  See the TF tutorials for information on these.
     marker.header.frame_id = "/world";
-    marker.header.stamp = ros::Time::now(); // TODO get from image
+    marker.header.stamp = time_stamp;
 
     // Set the namespace and id for this marker.  This serves to create a unique ID
     // Any marker sent with the same namespace and id will overwrite the old one
