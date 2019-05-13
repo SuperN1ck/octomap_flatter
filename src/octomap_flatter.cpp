@@ -118,25 +118,37 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     // octomap::point3d end_box(x_origin - x_length, y_origin + y_length, v.getZ());
 
     /* Better Method */
-    std::vector<tf::Vector3> box_corners{tf::Vector3(v.getX(), v.getY() + flattening_width / 2, 0),
-                                          tf::Vector3(v.getX(), v.getY() - flattening_width / 2, 0),
-                                          tf::Vector3(v.getX() + flattening_height, v.getY() + flattening_width / 2, 0),
-                                          tf::Vector3(v.getX() + flattening_height, v.getY() - flattening_width / 2, 0)};
+    // std::vector<tf::Vector3> box_corners{tf::Vector3(v.getX(), v.getY() + flattening_width / 2, 0),
+    //                                       tf::Vector3(v.getX(), v.getY() - flattening_width / 2, 0),
+    //                                       tf::Vector3(v.getX() + flattening_height, v.getY() + flattening_width / 2, 0),
+    //                                       tf::Vector3(v.getX() + flattening_height, v.getY() - flattening_width / 2, 0)};
+    
+    // for (tf::Vector3 point : box_corners)
+    // {
+    //     ROS_INFO_STREAM("Before rotating: " << point);
+    //     point = point.rotate(tf::Vector3(0., 0., 1.), yaw);
+    //     ROS_INFO_STREAM("After rotating: " << point);
+    //     x_min = std::min(point.getX(), x_min);
+    //     x_max = std::max(point.getX(), x_max);
+    //     y_min = std::min(point.getY(), y_min);
+    //     y_max = std::max(point.getY(), y_max);
+    // }
+
+    /* Even Better Method */
+    tf::Vector3 pt1 = v + tf::Vector3(0.0, flattening_width/2, 0.0).rotate(tf::Vector3(0., 0., 1.), yaw);
+    tf::Vector3 pt2 = v + tf::Vector3(0.0, -flattening_width/2, 0.0).rotate(tf::Vector3(0., 0., 1.), yaw);
+    tf::Vector3 pt3 = v + tf::Vector3(flattening_height, flattening_width/2, 0.0).rotate(tf::Vector3(0., 0., 1.), yaw);
+    tf::Vector3 pt4 = v + tf::Vector3(flattening_height, -flattening_width/2, 0.0).rotate(tf::Vector3(0., 0., 1.), yaw);
+    
     double x_min = std::numeric_limits<double>::max();
     double x_max = std::numeric_limits<double>::min();
     double y_min = std::numeric_limits<double>::max();
     double y_max = std::numeric_limits<double>::min();
-    
-    for (tf::Vector3 point : box_corners)
-    {
-        ROS_INFO_STREAM("Before rotating: " << point);
-        point.rotate(tf::Vector3(0., 0., 1.), yaw);
-        ROS_INFO_STREAM("After rotating: " << point);
-        x_min = std::min(point.getX(), x_min);
-        x_max = std::max(point.getX(), x_max);
-        y_min = std::min(point.getY(), y_min);
-        y_max = std::max(point.getY(), y_max);
-    }
+
+    x_min = std::min({pt1.getX(),pt2.getX(),pt3.getX(),pt4.getX()});
+    x_max = std::max({pt1.getX(),pt2.getX(),pt3.getX(),pt4.getX()});
+    y_min = std::min({pt1.getY(),pt2.getY(),pt3.getY(),pt4.getY()});
+    y_max = std::max({pt1.getY(),pt2.getY(),pt3.getY(),pt4.getY()});
 
     octomap::point3d start_box(x_min, y_min, min_Z);
     octomap::point3d end_box(x_max, y_max, v.getZ());
