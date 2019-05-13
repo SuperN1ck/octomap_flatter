@@ -41,6 +41,7 @@ private:
     /* Out */
     ros::Publisher octomap_pub_;
     ros::Publisher bounding_box_pub_;
+    ros::Publisher height_image_pub_;
     void publish_bounding_box(octomap::point3d start_box, octomap::point3d end_box, ros::Time time_stamp);
     void get_bounding_box(tf::StampedTransform& transform, octomap::point3d& start_box, octomap::point3d& end_box);
     /* Parameters */

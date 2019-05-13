@@ -4,6 +4,8 @@
 #include <octomap/OcTree.h>
 #include <cstdint>
 
+#include <sensor_msgs/Image.h>
+#include <sensor_msgs/image_encodings.h>
 #include <visualization_msgs/Marker.h>
 
 namespace octflat
@@ -19,8 +21,9 @@ OctomapFlatter::OctomapFlatter(ros::NodeHandle &nh, ros::NodeHandle &nh_private)
     /* In */
     connection_ = synchronizer_.registerCallback(boost::bind(&OctomapFlatter::octomapCallback, this, _1, _2));
     /* Out */
-    octomap_pub_ = nh.advertise<octomap_msgs::Octomap>("/octomap_flattened", 1);
-    bounding_box_pub_ = nh.advertise<visualization_msgs::Marker>("/octomap_flatter_bounding_box", 1);
+    octomap_pub_ = nh.advertise<octomap_msgs::Octomap>("/octomap_flattened", 10);
+    bounding_box_pub_ = nh.advertise<visualization_msgs::Marker>("/octomap_flatter_bounding_box", 10);
+    height_image_pub_ = nh.advertise<sensor_msgs::Image>("/height_image", 10);
     /* Parameters */
     dynamic_reconfigure::Server<octomap_flatter::OctoFlatterConfig>::CallbackType f;
     f = boost::bind(&OctomapFlatter::dynamicParameterCallback, this, _1, _2);
@@ -101,7 +104,7 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     double y_min = std::min({pt1.getY(),pt2.getY(),pt3.getY(),pt4.getY()});
     double y_max = std::max({pt1.getY(),pt2.getY(),pt3.getY(),pt4.getY()});
 
-    octomap::point3d start_box(x_min, y_min, min_Z);
+    octomap::point3d start_box(x_min, y_min, -v.getZ()); // Get threshold from somewhere else
     octomap::point3d end_box(x_max, y_max, v.getZ());
 
     ROS_INFO_STREAM("Bounding box: (" << x_min << ", " << y_min << ") --> (" << x_max << ", " << y_max << ")");
@@ -110,14 +113,75 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
 
     /* Create data array */
     // TODO Check for correct frame direction
-    // double resolution = m_octomap->getResolution();
-    // uint32_t image_width = end_box.x() - start_box.x() / resolution;
-    // uint32_t image_height = end_box.y() - start_box.y() / resolution;
+    double resolution = m_octomap->getResolution();
+    uint32_t image_width = (end_box.x() - start_box.x()) / resolution;
+    uint32_t image_height = (end_box.y() - start_box.y()) / resolution;
 
-    // ROS_INFO_STREAM("Image Width: " << image_width << " Image Height: " << image_height);
+    ROS_INFO_STREAM("Image Width: " << image_width << " Image Height: " << image_height);
 
     // /* Taken from sensor_msgs/Images documentation: uint8[] data # actual matrix data, size is (step * rows) */
-    // uint8_t data[image_width * image_height];
+    std::vector<uint8_t> data(image_width * image_height, 0);
+    for (octomap::OcTree::leaf_bbx_iterator it = m_octomap->begin_leafs_bbx(start_box, end_box), end = m_octomap->end_leafs_bbx(); it != end; ++it)
+    {
+        if (m_octomap->search(it.getCoordinate())->getOccupancy() < m_octomap->getOccupancyThres())
+            continue;
+        
+        int x = (it.getX() - start_box.x()) / resolution;
+        int y = (it.getY() - start_box.y()) / resolution;
+        int image_idx = y * image_width + x;
+
+        /* If coordinates are out-of-bounds */
+        if (image_idx >= image_width * image_height) 
+            continue;
+            // ROS_INFO_STREAM("x: " << x << " y: " << y << std::endl << "in width: " << image_width << " height: " << image_height);
+        
+        /* Normalize Z Value in box and scale up to 255 
+         * We need to add the resolution as the centers might be above the camera
+        */
+        uint8_t z = (it.getZ() - start_box.z()) / (end_box.z() + resolution - start_box.z()) * 255;
+
+        /* "+z" to actually print it (uint8_t is typedef char* --> no + results in as interpreting as a char*) */
+        ROS_INFO_STREAM("x, y: " << x << "x" << y << " z: " << +z); 
+        data[image_idx] = std::max(data[image_idx], z);
+    }
+
+    /*
+    Header header        # Header timestamp should be acquisition time of image
+                        # Header frame_id should be optical frame of camera
+                        # origin of frame should be optical center of camera
+                        # +x should point to the right in the image
+                        # +y should point down in the image
+                        # +z should point into to plane of the image
+                        # If the frame_id here and the frame_id of the CameraInfo
+                        # message associated with the image conflict
+                        # the behavior is undefined
+
+    uint32 height         # image height, that is, number of rows
+    uint32 width          # image width, that is, number of columns
+
+    # The legal values for encoding are in file src/image_encodings.cpp
+    # If you want to standardize a new string format, join
+    # ros-users@lists.sourceforge.net and send an email proposing a new encoding.
+
+    string encoding       # Encoding of pixels -- channel meaning, ordering, size
+                        # taken from the list of strings in include/sensor_msgs/image_encodings.h
+
+    uint8 is_bigendian    # is this data bigendian?
+    uint32 step           # Full row length in bytes
+    uint8[] data          # actual matrix data, size is (step * rows)
+    */
+    sensor_msgs::Image service_input;
+    service_input.header = octomap_msg->header;
+    service_input.height = image_height;
+    service_input.width = image_width;
+    service_input.encoding = sensor_msgs::image_encodings::MONO8;
+    service_input.is_bigendian = 0;
+    service_input.step = image_width;
+    service_input.data.assign(data.begin(), data.end());
+    ROS_INFO_STREAM("data size: " << service_input.data.size() << " should be: " << image_width * image_height);
+    height_image_pub_.publish(service_input);
+    // memcpy(&service_input->data, data, sizeof(uint8_t) * image_width * image_height);
+
     // /* Parallelize this loop for more speed */
     // for (uint y = 0; y < image_height; ++y)
     // {
@@ -140,8 +204,10 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     //     }
     // }
 
-    ROS_INFO_STREAM("Occupancy Threshold: " << m_octomap->getOccupancyThres());
+    // ROS_INFO_STREAM("Occupancy Threshold: " << m_octomap->getOccupancyThres());
 
+
+    /* Modify octomap */
     for (octomap::OcTree::leaf_iterator it = m_octomap->begin_leafs(), end = m_octomap->end_leafs(); it != end; ++it)
     {
         // Access various node proprertie e.g.:
