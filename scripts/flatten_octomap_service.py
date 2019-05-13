@@ -9,6 +9,7 @@ import cv2
 import imutils
 import scipy
 
+# gets the most likely value from its surround pixels
 def get_surround(cont, idx):
     if idx in [(0,0),(0,w-1),(h-1,0),(h-1,w-1)]:
         if idx == (0,0):
@@ -39,14 +40,18 @@ def flatten(img):
     mx = int(np.max(img))
     fin = img.copy()
 
+    # pad with some value (200) so that boxes that end outside the image are also considered
     img_pad = np.lib.pad(img, 2, 'constant', constant_values=200)
 
+    # get the edges of the image
     horizontal = scipy.ndimage.sobel(img_pad, 0)
     vertical = scipy.ndimage.sobel(img_pad, 1)
     edge_pad = np.hypot(horizontal, vertical)
 
+    # make all edges value to 255
     edge_pad = cv2.threshold(edge_pad, 5, 255, cv2.THRESH_BINARY)[1]
 
+    # get contours from the images made up of edges
     edge_pad = edge_pad.astype(np.uint8)
     contours = cv2.findContours(edge_pad, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     contours = imutils.grab_contours(contours)
@@ -54,6 +59,7 @@ def flatten(img):
 
     if len(contours) >= 1:
         col = mx
+        # fill in the polygon of the edges with the same height (label)
         for c in contours[:-1]:
             col += 1
             cv2.drawContours(edge_pad, [c], -1, col, 2)
@@ -62,6 +68,7 @@ def flatten(img):
         avg = [[0,0] for box in range(col-mx)]
         edge_fill = edge_pad[2:-2,2:-2]
         
+        # sum up the real height values for pixels that belong to the same box
         for idx, val in np.ndenumerate(edge_fill):
             if val == 255:
                 val = get_surround(edge_fill, idx)
@@ -70,14 +77,17 @@ def flatten(img):
                 avg[val-mx-1][0] += img[idx]
                 avg[val-mx-1][1] += 1
         
+        # calculate average height of each box
         for a in avg:
             if not a[1] == 0:
                 a[0] //= a[1]
         
+        # fill in the final image with the average height
         for idx, val in np.ndenumerate(edge_fill):
             if val > mx:
                 fin[idx] = avg[val-mx-1][0]
         
+        # make ground level 0
         msk = ma.masked_equal(edge_fill, 0).mask
         gnd = np.multiply(img,msk)
         avg = np.sum(gnd) / float(np.sum(msk))
