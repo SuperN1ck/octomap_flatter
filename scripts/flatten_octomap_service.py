@@ -6,6 +6,7 @@ import rospy
 import numpy as np
 import numpy.ma as ma
 import cv2
+from cv_bridge import CvBridge, CvBridgeError
 import imutils
 import scipy
 
@@ -48,7 +49,7 @@ def flatten(img):
     vertical = scipy.ndimage.sobel(img_pad, 1)
     edge_pad = np.hypot(horizontal, vertical)
 
-    # make all edges value to 255
+    # make all edges value to 255. TODO: How will we choose the threshold?
     edge_pad = cv2.threshold(edge_pad, 5, 255, cv2.THRESH_BINARY)[1]
 
     # get contours from the images made up of edges
@@ -97,7 +98,15 @@ def flatten(img):
     return fin
 
 def call_flatten(req):
-    return OctoImageResponse(flatten(req.input))
+    # img = np.array(req.input.data).reshape(req.input.height, req.input.width)
+    bridge = CvBridge()
+    try:
+        img = np.array(bridge.imgmsg_to_cv2(req.input, "mono8"))
+    except CvBridgeError as e:
+        print(e)
+
+    new_img = flatten(img)
+    return OctoImageResponse(bridge.cv2_to_imgmsg(new_img, "mono8"))
 
 rospy.init_node('flatten_octomap_server')
 s = rospy.Service('flatten_octomap', OctoImage, call_flatten)

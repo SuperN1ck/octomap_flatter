@@ -104,7 +104,7 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     double y_min = std::min({pt1.getY(),pt2.getY(),pt3.getY(),pt4.getY()});
     double y_max = std::max({pt1.getY(),pt2.getY(),pt3.getY(),pt4.getY()});
 
-    octomap::point3d start_box(x_min, y_min, -v.getZ()); // Get threshold from somewhere else
+    octomap::point3d start_box(x_min, y_min, 0); // -v.getZ() // Get threshold from somewhere else
     octomap::point3d end_box(x_max, y_max, v.getZ());
 
     ROS_INFO_STREAM("Bounding box: (" << x_min << ", " << y_min << ") --> (" << x_max << ", " << y_max << ")");
@@ -117,33 +117,39 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     uint32_t image_width = (end_box.x() - start_box.x()) / resolution;
     uint32_t image_height = (end_box.y() - start_box.y()) / resolution;
 
-    ROS_INFO_STREAM("Image Width: " << image_width << " Image Height: " << image_height);
+    ROS_INFO_STREAM("Image Width: " << image_width << " Image Height: " << image_height << " Res: " << resolution);
 
     // /* Taken from sensor_msgs/Images documentation: uint8[] data # actual matrix data, size is (step * rows) */
     std::vector<uint8_t> data(image_width * image_height, 0);
+    int full_cnt = 0;
+    int cnt = 0;
     for (octomap::OcTree::leaf_bbx_iterator it = m_octomap->begin_leafs_bbx(start_box, end_box), end = m_octomap->end_leafs_bbx(); it != end; ++it)
     {
+        full_cnt ++;
         if (m_octomap->search(it.getCoordinate())->getOccupancy() < m_octomap->getOccupancyThres())
             continue;
+        cnt ++;
         
         int x = (it.getX() - start_box.x()) / resolution;
         int y = (it.getY() - start_box.y()) / resolution;
         int image_idx = y * image_width + x;
 
         /* If coordinates are out-of-bounds */
-        if (image_idx >= image_width * image_height) 
+        if (image_idx >= image_width * image_height) {
+            // ROS_INFO_STREAM("Out of Bounds x: " << x << " y: " << y << std::endl << "in width: " << image_width << " height: " << image_height);
             continue;
-            // ROS_INFO_STREAM("x: " << x << " y: " << y << std::endl << "in width: " << image_width << " height: " << image_height);
-        
+        }
         /* Normalize Z Value in box and scale up to 255 
          * We need to add the resolution as the centers might be above the camera
         */
-        uint8_t z = (it.getZ() - start_box.z()) / (end_box.z() + resolution - start_box.z()) * 255;
+        // uint8_t z = (it.getZ() - start_box.z()) / (end_box.z() + resolution - start_box.z()) * 255;
+        uint8_t z = it.getZ() / (end_box.z() + resolution) * 255;
 
         /* "+z" to actually print it (uint8_t is typedef char* --> no + results in as interpreting as a char*) */
-        ROS_INFO_STREAM("x, y: " << x << "x" << y << " z: " << +z); 
+        // ROS_INFO_STREAM("x, y: " << x << "x" << y << " z: " << +z); 
         data[image_idx] = std::max(data[image_idx], z);
     }
+    ROS_INFO_STREAM("Out of " << full_cnt << ", " << cnt << " chosen");
 
     /*
     Header header        # Header timestamp should be acquisition time of image
@@ -180,6 +186,25 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     service_input.data.assign(data.begin(), data.end());
     ROS_INFO_STREAM("data size: " << service_input.data.size() << " should be: " << image_width * image_height);
     height_image_pub_.publish(service_input);
+
+
+    // Send height_image to the service and get the new_image
+    ros::ServiceClient client = nh.serviceClient<octomap_flatter::OctoImage>("flatten_octomap");
+    octomap_flatter::OctoImage srv;
+
+    srv.request.input = service_input;
+    if (client.call(srv))
+    {
+        sensor_msgs::Image service_output = srv.response.output;
+        ROS_INFO_STREAM("Service returned image of size " << service_output.height << " x " << service_output.width);
+    }
+    else
+    {
+        ROS_ERROR("Failed to call service add_two_ints");
+        return 1;
+    }
+
+
     // memcpy(&service_input->data, data, sizeof(uint8_t) * image_width * image_height);
 
     // /* Parallelize this loop for more speed */
