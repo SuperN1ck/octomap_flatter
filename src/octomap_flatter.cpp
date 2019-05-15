@@ -1,4 +1,6 @@
 #include <octomap_flatter.h>
+#include <octomap_flatter/OctoImage.h>
+
 #include <octomap_msgs/conversions.h>
 #include <octomap/ColorOcTree.h>
 #include <octomap/OcTree.h>
@@ -7,6 +9,7 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
 #include <visualization_msgs/Marker.h>
+
 
 namespace octflat
 {
@@ -28,6 +31,9 @@ OctomapFlatter::OctomapFlatter(ros::NodeHandle &nh, ros::NodeHandle &nh_private)
     dynamic_reconfigure::Server<octomap_flatter::OctoFlatterConfig>::CallbackType f;
     f = boost::bind(&OctomapFlatter::dynamicParameterCallback, this, _1, _2);
     param_server_.setCallback(f);
+
+    cluster_service_ = nh.serviceClient<octomap_flatter::OctoImage>("flatten_octomap");
+
 
     ROS_INFO("started octomap_flatter ...");
 }
@@ -142,9 +148,8 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
         /* Normalize Z Value in box and scale up to 255 
          * We need to add the resolution as the centers might be above the camera
         */
-        // uint8_t z = (it.getZ() - start_box.z()) / (end_box.z() + resolution - start_box.z()) * 255;
-        uint8_t z = it.getZ() / (end_box.z() + resolution) * 255;
-
+        uint8_t z = (it.getZ() - start_box.z()) / (end_box.z() + resolution - start_box.z()) * 255;
+    
         /* "+z" to actually print it (uint8_t is typedef char* --> no + results in as interpreting as a char*) */
         // ROS_INFO_STREAM("x, y: " << x << "x" << y << " z: " << +z); 
         data[image_idx] = std::max(data[image_idx], z);
@@ -189,19 +194,18 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
 
 
     // Send height_image to the service and get the new_image
-    ros::ServiceClient client = nh.serviceClient<octomap_flatter::OctoImage>("flatten_octomap");
     octomap_flatter::OctoImage srv;
 
     srv.request.input = service_input;
-    if (client.call(srv))
+    if (cluster_service_.call(srv))
     {
         sensor_msgs::Image service_output = srv.response.output;
         ROS_INFO_STREAM("Service returned image of size " << service_output.height << " x " << service_output.width);
     }
     else
     {
-        ROS_ERROR("Failed to call service add_two_ints");
-        return 1;
+        ROS_ERROR("Failed to call flattening service");
+        return;
     }
 
 
