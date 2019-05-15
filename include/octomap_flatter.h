@@ -49,6 +49,8 @@ private:
     dynamic_reconfigure::Server<octomap_flatter::OctoFlatterConfig> param_server_;
     void dynamicParameterCallback(octomap_flatter::OctoFlatterConfig &config, uint32_t level);
 
+    ros::ServiceClient cluster_service_;
+
 public:
     OctomapFlatter(ros::NodeHandle &nh, ros::NodeHandle &nh_private);
 };

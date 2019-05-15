@@ -1,4 +1,6 @@
 #include <octomap_flatter.h>
+#include <octomap_flatter/OctoImage.h>
+
 #include <octomap_msgs/conversions.h>
 #include <octomap/ColorOcTree.h>
 #include <octomap/OcTree.h>
@@ -7,6 +9,7 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
 #include <visualization_msgs/Marker.h>
+
 
 namespace octflat
 {
@@ -28,6 +31,9 @@ OctomapFlatter::OctomapFlatter(ros::NodeHandle &nh, ros::NodeHandle &nh_private)
     dynamic_reconfigure::Server<octomap_flatter::OctoFlatterConfig>::CallbackType f;
     f = boost::bind(&OctomapFlatter::dynamicParameterCallback, this, _1, _2);
     param_server_.setCallback(f);
+
+    cluster_service_ = nh.serviceClient<octomap_flatter::OctoImage>("flatten_octomap");
+
 
     ROS_INFO("started octomap_flatter ...");
 }
@@ -104,7 +110,7 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     double y_min = std::min({pt1.getY(),pt2.getY(),pt3.getY(),pt4.getY()});
     double y_max = std::max({pt1.getY(),pt2.getY(),pt3.getY(),pt4.getY()});
 
-    octomap::point3d start_box(x_min, y_min, 0); // -v.getZ() // Get threshold from somewhere else
+    octomap::point3d start_box(x_min, y_min, -0.3); // -v.getZ() // Get threshold from somewhere else
     octomap::point3d end_box(x_max, y_max, v.getZ());
 
     ROS_INFO_STREAM("Bounding box: (" << x_min << ", " << y_min << ") --> (" << x_max << ", " << y_max << ")");
@@ -114,8 +120,8 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     /* Create data array */
     // TODO Check for correct frame direction
     double resolution = m_octomap->getResolution();
-    uint32_t image_width = (end_box.x() - start_box.x()) / resolution;
-    uint32_t image_height = (end_box.y() - start_box.y()) / resolution;
+    uint32_t image_width = ((end_box.x() - start_box.x()) / resolution) + 2; // We need to add 2 in case the center is out of the bounding box
+    uint32_t image_height = ((end_box.y() - start_box.y()) / resolution) + 2;
 
     ROS_INFO_STREAM("Image Width: " << image_width << " Image Height: " << image_height << " Res: " << resolution);
 
@@ -134,17 +140,17 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
         int y = (it.getY() - start_box.y()) / resolution;
         int image_idx = y * image_width + x;
 
-        /* If coordinates are out-of-bounds */
-        if (image_idx >= image_width * image_height) {
-            // ROS_INFO_STREAM("Out of Bounds x: " << x << " y: " << y << std::endl << "in width: " << image_width << " height: " << image_height);
-            continue;
-        }
-        /* Normalize Z Value in box and scale up to 255 
-         * We need to add the resolution as the centers might be above the camera
-        */
-        // uint8_t z = (it.getZ() - start_box.z()) / (end_box.z() + resolution - start_box.z()) * 255;
-        uint8_t z = it.getZ() / (end_box.z() + resolution) * 255;
+        if (x == image_width || y == image_height)
+        {
+            ROS_INFO_STREAM("Invalid idx" << std::endl 
+                << "x: " << x << " it.getX(): " << it.getX() << std::endl
+                << "y: " << y << " it.getY(): " << it.getY() << std::endl);
+        } 
 
+        /*  Normalize Z Value in box and scale up to 255 
+            We need to add the resolution as the centers might be above the camera */
+        uint8_t z = (it.getZ() - start_box.z()) / (end_box.z() + resolution - start_box.z()) * 255;
+    
         /* "+z" to actually print it (uint8_t is typedef char* --> no + results in as interpreting as a char*) */
         // ROS_INFO_STREAM("x, y: " << x << "x" << y << " z: " << +z); 
         data[image_idx] = std::max(data[image_idx], z);
@@ -189,19 +195,18 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
 
 
     // Send height_image to the service and get the new_image
-    ros::ServiceClient client = nh.serviceClient<octomap_flatter::OctoImage>("flatten_octomap");
     octomap_flatter::OctoImage srv;
 
     srv.request.input = service_input;
-    if (client.call(srv))
+    if (cluster_service_.call(srv))
     {
         sensor_msgs::Image service_output = srv.response.output;
         ROS_INFO_STREAM("Service returned image of size " << service_output.height << " x " << service_output.width);
     }
     else
     {
-        ROS_ERROR("Failed to call service add_two_ints");
-        return 1;
+        ROS_ERROR("Failed to call flattening service");
+        return;
     }
 
 

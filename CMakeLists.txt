@@ -7,7 +7,7 @@ add_compile_options(-std=c++11)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS roscpp octomap_msgs message_filters dynamic_reconfigure rospy message_generation std_msgs geometry_msgs tf)
+find_package(catkin REQUIRED COMPONENTS roscpp octomap_msgs message_filters dynamic_reconfigure rospy message_generation std_msgs geometry_msgs tf catkin_virtualenv)
 find_package(cmake_modules REQUIRED)
 
 # Octomap
@@ -22,7 +22,7 @@ link_libraries(${OCTOMAP_LIBRARIES})
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
 ## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
-catkin_python_setup()
+# catkin_python_setup()
 
 ################################################
 ## Declare ROS messages, services and actions ##
@@ -111,6 +111,9 @@ catkin_package(
 #  DEPENDS system_lib
 )
 
+install(FILES requirements.txt
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+
 ###########
 ## Build ##
 ###########
@@ -156,6 +159,8 @@ target_link_libraries(${PROJECT_NAME}_node
    ${PROJECT_NAME}
 )
 
+catkin_generate_virtualenv()
+
 #############
 ## Install ##
 #############
@@ -190,6 +195,11 @@ target_link_libraries(${PROJECT_NAME}_node
 #   # myfile2
 #   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 # )
+
+catkin_install_python(
+   PROGRAMS
+      scripts/flatten_octomap_service.py
+   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 #############
 ## Testing ##
