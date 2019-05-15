@@ -12,7 +12,7 @@ import scipy
 import scipy.ndimage
 
 # gets the most likely value from its surround pixels
-def get_surround(cont, idx):
+def get_surround(cont, idx, h, w):
     if idx in [(0,0),(0,w-1),(h-1,0),(h-1,w-1)]:
         if idx == (0,0):
             neigh = cont[:2,:2].ravel()
@@ -96,7 +96,7 @@ def flatten(img):
         # sum up the real height values for pixels that belong to the same box
         for idx, val in np.ndenumerate(edge_fill):
             if val == 255:
-                val = get_surround(edge_fill, idx)
+                val = get_surround(edge_fill, idx, h, w)
                 edge_fill[idx] = val
             if val > mx:
                 avg[val-mx-1][0] += img[idx]
