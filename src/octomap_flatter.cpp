@@ -110,7 +110,7 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     double y_min = std::min({pt1.getY(),pt2.getY(),pt3.getY(),pt4.getY()});
     double y_max = std::max({pt1.getY(),pt2.getY(),pt3.getY(),pt4.getY()});
 
-    octomap::point3d start_box(x_min, y_min, 0); // -v.getZ() // Get threshold from somewhere else
+    octomap::point3d start_box(x_min, y_min, -0.3); // -v.getZ() // Get threshold from somewhere else
     octomap::point3d end_box(x_max, y_max, v.getZ());
 
     ROS_INFO_STREAM("Bounding box: (" << x_min << ", " << y_min << ") --> (" << x_max << ", " << y_max << ")");
@@ -120,8 +120,8 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     /* Create data array */
     // TODO Check for correct frame direction
     double resolution = m_octomap->getResolution();
-    uint32_t image_width = (end_box.x() - start_box.x()) / resolution;
-    uint32_t image_height = (end_box.y() - start_box.y()) / resolution;
+    uint32_t image_width = ((end_box.x() - start_box.x()) / resolution) + 2; // We need to add 2 in case the center is out of the bounding box
+    uint32_t image_height = ((end_box.y() - start_box.y()) / resolution) + 2;
 
     ROS_INFO_STREAM("Image Width: " << image_width << " Image Height: " << image_height << " Res: " << resolution);
 
@@ -140,14 +140,15 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
         int y = (it.getY() - start_box.y()) / resolution;
         int image_idx = y * image_width + x;
 
-        /* If coordinates are out-of-bounds */
-        if (image_idx >= image_width * image_height) {
-            // ROS_INFO_STREAM("Out of Bounds x: " << x << " y: " << y << std::endl << "in width: " << image_width << " height: " << image_height);
-            continue;
-        }
-        /* Normalize Z Value in box and scale up to 255 
-         * We need to add the resolution as the centers might be above the camera
-        */
+        if (x == image_width || y == image_height)
+        {
+            ROS_INFO_STREAM("Invalid idx" << std::endl 
+                << "x: " << x << " it.getX(): " << it.getX() << std::endl
+                << "y: " << y << " it.getY(): " << it.getY() << std::endl);
+        } 
+
+        /*  Normalize Z Value in box and scale up to 255 
+            We need to add the resolution as the centers might be above the camera */
         uint8_t z = (it.getZ() - start_box.z()) / (end_box.z() + resolution - start_box.z()) * 255;
     
         /* "+z" to actually print it (uint8_t is typedef char* --> no + results in as interpreting as a char*) */
