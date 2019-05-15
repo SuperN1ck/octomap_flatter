@@ -57,13 +57,36 @@ def flatten(img):
     contours = cv2.findContours(edge_pad, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     contours = imutils.grab_contours(contours)
     contours = [c for c in contours if len(c) >= 8]
+    contours = sorted(contours, key = cv2.contourArea, reverse = True)
 
     if len(contours) >= 1:
         col = mx
+        # first check the biggest polygon (is it a slope?)
+        msk = np.zeros(np.shape(img_pad))
+        cv2.fillPoly(msk, pts =[c], color=1)
+        for c in contours[1:]:
+            cv2.fillPoly(msk, pts =[c], color=0)
+        gnd = np.multiply(img_pad,msk)
+        k, v = np.unique(gnd, return_counts=True)
+        pix_dict = dict(zip(k,v))
+        for i in (0,200,255):
+            if i in pix_dict:
+                del pix_dict[i]
+        pix_list = list(pix_dict.items())
+        rng = int(pix_list[-1][0] - pix_list[0][0])
+        rng //= 5
+        peak = int(max(pix_dict, key=pix_dict.get))
+        peak_sum = 0
+        for i in range(peak-rng,peak+rng+1):
+            if i in pix_dict:
+                peak_sum += pix_dict[i]
+        if not float(peak_sum) / sum(pix_dict.values()) > 0.8:
+            contours = contours[1:]
+
         # fill in the polygon of the edges with the same height (label)
-        for c in contours[:-1]:
+        for c in contours:
             col += 1
-            cv2.drawContours(edge_pad, [c], -1, col, 2)
+            cv2.drawContours(edge_pad, [c], -1, col, 1)
             cv2.fillPoly(edge_pad, pts =[c], color=col)
         
         avg = [[0,0] for box in range(col-mx)]
@@ -89,11 +112,16 @@ def flatten(img):
                 fin[idx] = avg[val-mx-1][0]
         
         # make ground level 0
-        msk = ma.masked_equal(edge_fill, 0).mask
-        gnd = np.multiply(img,msk)
-        avg = np.sum(gnd) / float(np.sum(msk))
-        if avg <= 1:
-            fin = np.multiply(fin, ~msk)
+        # msk = ma.masked_equal(edge_fill, 0).mask
+        # gnd = np.multiply(img,msk)
+        # avg = np.sum(gnd) / float(np.sum(msk))
+        # if avg <= 1:
+        #     fin = np.multiply(fin, ~msk)
+
+        # May be needed later for masking / slopes
+	    # msk = ma.masked_where(1 <= edge_fill <= mx, edge_fill).mask
+        # unique, counts = np.unique(gnd, return_counts=True)
+        # dict(zip(unique, counts))
 
     return fin
 
