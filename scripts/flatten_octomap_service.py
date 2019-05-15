@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+'''#!/usr/bin/env python'''
 
 from octomap_flatter.srv import *
 import rospy
@@ -9,6 +9,7 @@ import cv2
 from cv_bridge import CvBridge, CvBridgeError
 import imutils
 import scipy
+import scipy.ndimage
 
 # gets the most likely value from its surround pixels
 def get_surround(cont, idx):
