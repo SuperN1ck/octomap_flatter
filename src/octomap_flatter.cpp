@@ -98,6 +98,8 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     // TODO: Get from config
     double flattening_width = 1.0;
     double flattening_height = 2.0;
+    double box_height = 1.5; // Shouldn't be bigger than 2.45 m
+    double min_image_height = 10; // Want from 10 upwards
 
     tf::Vector3 z_axis(0., 0., 1.);
     tf::Vector3 pt1 = v + tf::Vector3(0.0, flattening_width/2, 0.0).rotate(z_axis, yaw);
@@ -110,7 +112,7 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     double y_min = std::min({pt1.getY(),pt2.getY(),pt3.getY(),pt4.getY()});
     double y_max = std::max({pt1.getY(),pt2.getY(),pt3.getY(),pt4.getY()});
 
-    octomap::point3d start_box(x_min, y_min, -0.3); // -v.getZ() // Get threshold from somewhere else
+    octomap::point3d start_box(x_min, y_min, v.getZ() - box_height); // -v.getZ() // Get threshold from somewhere else
     octomap::point3d end_box(x_max, y_max, v.getZ());
 
     ROS_INFO_STREAM("Bounding box: (" << x_min << ", " << y_min << ") --> (" << x_max << ", " << y_max << ")");
@@ -149,7 +151,8 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
 
         /*  Normalize Z Value in box and scale up to 255 
             We need to add the resolution as the centers might be above the camera */
-        uint8_t z = (it.getZ() - start_box.z()) / (end_box.z() + resolution - start_box.z()) * 255;
+        // uint8_t z = (it.getZ() - start_box.z()) / (end_box.z() + resolution - start_box.z()) * 255;
+        uint8_t z = ((it.getZ() - start_box.z()) * 100) + min_image_height;
     
         /* "+z" to actually print it (uint8_t is typedef char* --> no + results in as interpreting as a char*) */
         // ROS_INFO_STREAM("x, y: " << x << "x" << y << " z: " << +z); 

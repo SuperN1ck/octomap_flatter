@@ -1,4 +1,4 @@
-'''#!/usr/bin/env python'''
+#!/usr/bin/env python
 
 from octomap_flatter.srv import *
 import rospy
@@ -51,10 +51,10 @@ def flatten(img):
     edge_pad = np.hypot(horizontal, vertical)
 
     # make all edges value to 255. TODO: How will we choose the threshold?
+    edge_pad = edge_pad.astype(np.uint8)
     edge_pad = cv2.threshold(edge_pad, 5, 255, cv2.THRESH_BINARY)[1]
 
     # get contours from the images made up of edges
-    edge_pad = edge_pad.astype(np.uint8)
     contours = cv2.findContours(edge_pad, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     contours = imutils.grab_contours(contours)
     contours = [c for c in contours if len(c) >= 8]
