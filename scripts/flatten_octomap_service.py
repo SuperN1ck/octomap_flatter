@@ -3,6 +3,9 @@
 from octomap_flatter.srv import *
 import rospy
 
+# import matplotlib; matplotlib.use('SVG')
+import matplotlib.pyplot as plt
+
 import numpy as np
 import numpy.ma as ma
 import cv2
@@ -10,6 +13,12 @@ from cv_bridge import CvBridge, CvBridgeError
 import imutils
 import scipy
 import scipy.ndimage
+
+print(imutils)
+
+import os 
+counter = 0
+global counter
 
 # gets the most likely value from its surround pixels
 def get_surround(cont, idx, h, w):
@@ -41,6 +50,9 @@ def flatten(img):
     h, w = np.shape(img)
     mx = int(np.max(img))
     fin = img.copy()
+
+    global counter
+    cv2.imwrite("/home/nick/output/" + str(counter) + "_img.png", img)
 
     # pad with some value (200) so that boxes that end outside the image are also considered
     img_pad = np.lib.pad(img, 2, 'constant', constant_values=200)
@@ -124,6 +136,22 @@ def flatten(img):
         # unique, counts = np.unique(gnd, return_counts=True)
         # dict(zip(unique, counts))
 
+    # fig, ax = plt.subplots(nrows=4, sharex=True, sharey=True, figsize=(6, 12))
+    # 
+    # ax[0].imshow(img,cmap='gray')
+    # ax[1].imshow(fin,cmap='gray')
+    # ax[2].imshow(qwer,cmap='gray')
+    # ax[3].imshow(asdf,cmap='gray')
+    # 
+    # for a in ax:
+    #     a.axis('off')
+    # 
+    # plt.tight_layout()
+    # plt.show()
+
+    cv2.imwrite("/home/nick/output/" + str(counter) + "_fin.png", fin)
+    counter += 1
+
     return fin
 
 def call_flatten(req):
@@ -141,4 +169,6 @@ rospy.init_node('flatten_octomap_server')
 s = rospy.Service('flatten_octomap', OctoImage, call_flatten)
 print("Starting flatten_octomap_server")
 
+import sys
+print(sys.executable)
 rospy.spin()

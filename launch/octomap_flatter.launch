@@ -6,5 +6,5 @@
         <!-- Params go here -->
   </node>
 
-   <!-- <node pkg="octomap_flatter" type="flatten_octomap_service.py" name="flatten_octomap_service" output="screen" /> -->
+   <node pkg="octomap_flatter" type="flatten_octomap_service.py" name="flatten_octomap_service" output="screen" />
 </launch>
