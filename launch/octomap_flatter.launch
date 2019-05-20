@@ -1,10 +1,39 @@
 <launch>
 
-  <include file="$(find octomap_flatter)/launch/octomap.launch" />
+    <include file="$(find octomap_flatter)/launch/octomap.launch" />
 
-  <node pkg="octomap_flatter" type="octomap_flatter_node" name="octomap_flatter" output="screen">
-        <!-- Params go here -->
-  </node>
+    <node pkg="octomap_flatter" type="octomap_flatter_node" name="octomap_flatter" output="screen" />
 
-   <node pkg="octomap_flatter" type="flatten_octomap_service.py" name="flatten_octomap_service" output="screen" />
+    <node pkg="octomap_flatter" type="flatten_octomap_service.py" name="flatten_octomap_service" output="screen" />
+
+    <node pkg="rosbag" type="play" name="rosbag_player" output="screen" args="--clock -d 1 -u 30 /home/nick/projects/intel_realsense_ws/test_v3.bag"/>
+    
+    
+    <!-- static_transform_publisher x y z qx qy qz qw frame_id child_frame_id  period_in_ms -->
+    <!-- Temporarly place this here -->
+
+    <!-- WORLD -->
+    <!-- rosrun tf static_transform_publisher 1.0 0 1.0 0 0 0 1 world base_link 100 -->
+    <node pkg="tf" type="static_transform_publisher" name="world_to_baselink_tf_pub" args="1 0 1 0 0 0 1 world base_link 100" />
+  
+    <!-- CAMERA LINK -->
+    <!-- 0 Degree -->
+    <!-- rosrun tf static_transform_publisher 0 0 0.5 0 0 0 1 base_link camera_link 100 -->
+    <!-- <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args="0 0 0.5 0 0 0 1 base_link camera_link 100" /> -->
+    <!-- 45 Degree -->
+    <!-- rosrun tf static_transform_publisher 0 0 0.5 0 0.383 0 0.924 base_link camera_link 100 -->
+    <!-- <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args="0 0 0.5 0 0.383 0 0.924 base_link camera_link 100" /> -->
+    <!-- 90 Degree -->
+    <!-- rosrun tf static_transform_publisher 0 0 0.5 0 0.707 0 0.707 base_link camera_link 100 -->
+    <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args=" 0 0 0.5 0 0.707 0 0.707 base_link camera_link 100" />
+
+    <param name="/use_sim_time" value="True"/>
+    
+    <node pkg="dvo_ros" type="camera_tracker" name="dvo_slam_node" output="screen">
+        <param name="run_dense_tracking" value="True"/>
+        <param name="use_initial_estimate" value="False"/>
+        <param name="use_weighting" value="True"/>
+    </node>
+
+      
 </launch>
