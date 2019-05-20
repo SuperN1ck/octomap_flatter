@@ -12,7 +12,7 @@
     <param name="pointcloud_max_y" value="100" />
     <param name="pointcloud_min_y" value="-100" />
     <param name="pointcloud_max_z" value="100" />
-    <param name="pointcloud_min_z" value="-100" />
+    <param name="pointcloud_min_z" value="-0.3" />
 
     <param name="occupancy_min_z" value="0.05" />
     <!-- This gives an error -->

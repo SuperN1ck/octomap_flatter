@@ -97,7 +97,7 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
 
     // TODO: Get from config
     double flattening_width = 1.0;
-    double flattening_height = 2.0;
+    double flattening_height = 1.0;
     double box_height = 1.5; // Shouldn't be bigger than 2.45 m
     double min_image_height = 10; // Want from 10 upwards
 
@@ -157,6 +157,10 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
         /* "+z" to actually print it (uint8_t is typedef char* --> no + results in as interpreting as a char*) */
         // ROS_INFO_STREAM("x, y: " << x << "x" << y << " z: " << +z); 
         data[image_idx] = std::max(data[image_idx], z);
+
+        octomap::OcTreeKey key = it.getKey();
+        /* Delete current node */
+        m_octomap->deleteNode(key);
     }
     ROS_INFO_STREAM("Out of " << full_cnt << ", " << cnt << " chosen");
 
@@ -201,9 +205,10 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     octomap_flatter::OctoImage srv;
 
     srv.request.input = service_input;
+    sensor_msgs::Image service_output;
     if (cluster_service_.call(srv))
     {
-        sensor_msgs::Image service_output = srv.response.output;
+        service_output = srv.response.output;
         ROS_INFO_STREAM("Service returned image of size " << service_output.height << " x " << service_output.width);
     }
     else
@@ -212,58 +217,89 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
         return;
     }
 
+    for (uint32_t image_y = 0; image_y < service_output.height; ++image_y)
+    {
+        for (uint32_t image_x = 0; image_x < service_output.width; ++image_x)
+        {
+            float x_coord = (image_x * resolution) + start_box.x();
+            float y_coord = (image_y * resolution) + start_box.y();
+            float z_coord;
+            int image_idx = image_y * service_output.step + image_y;
 
-    // memcpy(&service_input->data, data, sizeof(uint8_t) * image_width * image_height);
+            uint8_t image_z = service_output.data[image_idx];
+            if (image_z < 10)
+                z_coord = 0;
+            else
+                z_coord = (service_output.data[image_idx] - min_image_height) / 100;
+            
+            octomap::point3d coord(x_coord, y_coord, z_coord);
+            /* Set it filled */
+            m_octomap->updateNode(coord, true, true);
+        }
+    }
 
-    // /* Parallelize this loop for more speed */
-    // for (uint y = 0; y < image_height; ++y)
+    // for (auto const & it : service_output.data)
     // {
-    //     for (uint x = 0; x < image_width; ++x)
-    //     {
-    //         array_idx = y * image_width + x;
-    //         octomap::KeyRay key_ray;
-    //         m_octomap->computeRayKeys(
-    //             octomap::point3d(x_min + x * resolution, y_min + y * resolution, v.getZ()),
-    //             octomap::point3d(0, 0, -1),
-    //             key_ray);
-    //         ROS_INFO("------------------------------");
-    //         ROS_INFO_STREAM("Key Ray Size: " << key_ray.size());
-    //         for (auto key : key_ray)
-    //         {
-    //             octomap::OcTreeNode* node = m_octomap->search(key);
-    //             if (node && node->getOccupancy() > m_octomap->getOccupancyThres())
-    //                 ROS_INFO_STREAM("Node: " << node->getOccupancy());
-    //         }
-    //     }
+    //     ROS_INFO_STREAM("Iterator: " << +it);
     // }
 
-    // ROS_INFO_STREAM("Occupancy Threshold: " << m_octomap->getOccupancyThres());
+    // for (octomap::OcTree::leaf_bbx_iterator it = m_octomap->begin_leafs_bbx(start_box, end_box), end = m_octomap->end_leafs_bbx(); it != end; ++it)
+    // {
+    //     if (m_octomap->search(it.getCoordinate())->getOccupancy() < m_octomap->getOccupancyThres())
+    //         continue;
+        
+    //     int x = (it.getX() - start_box.x()) / resolution;
+    //     int y = (it.getY() - start_box.y()) / resolution;
+    //     int image_idx = y * image_width + x;
 
+    //     if (x == image_width || y == image_height)
+    //     {
+    //         ROS_INFO_STREAM("Invalid idx" << std::endl 
+    //             << "x: " << x << " it.getX(): " << it.getX() << std::endl
+    //             << "y: " << y << " it.getY(): " << it.getY() << std::endl);
+    //     } 
+
+    //     /*  Normalize Z Value in box and scale up to 255 
+    //         We need to add the resolution as the centers might be above the camera */
+    //     // uint8_t z = (it.getZ() - start_box.z()) / (end_box.z() + resolution - start_box.z()) * 255;
+    //     uint8_t z = ((it.getZ() - start_box.z()) * 100) + min_image_height;
+    
+    //     /* "+z" to actually print it (uint8_t is typedef char* --> no + results in as interpreting as a char*) */
+    //     // ROS_INFO_STREAM("x, y: " << x << "x" << y << " z: " << +z); 
+    //     data[image_idx] = std::max(data[image_idx], z);
+
+    //     octomap::OcTreeKey key = it.getKey();
+    //     /* Delete current node */
+    //     m_octomap->deleteNode(key);
+    // }
 
     /* Modify octomap */
-    for (octomap::OcTree::leaf_iterator it = m_octomap->begin_leafs(), end = m_octomap->end_leafs(); it != end; ++it)
-    {
-        // Access various node proprertie e.g.:
-        // std::cout << "Node center: " << it.getCoordinate() << std::endl;
-        // std::cout << "Node size: " << it.getSize() << std::endl;
-        // std::cout << "Node value: " << it->getValue() << std::endl;
-        octomap::point3d coord = it.getCoordinate();
+    // for (octomap::OcTree::leaf_iterator it = m_octomap->begin_leafs(), end = m_octomap->end_leafs(); it != end; ++it)
+    // {
+    //     // Access various node proprertie e.g.:
+    //     // std::cout << "Node center: " << it.getCoordinate() << std::endl;
+    //     // std::cout << "Node size: " << it.getSize() << std::endl;
+    //     // std::cout << "Node value: " << it->getValue() << std::endl;
+    //     octomap::point3d coord = it.getCoordinate();
 
-        if (coord.z() > min_Z + config_.height_threshold)
-            continue;
+    //     if (coord.z() > min_Z + config_.height_threshold)
+    //         continue;
 
-        octomap::OcTreeKey key = it.getKey();
-        // ROS_INFO_STREAM("Key: " << key[0] << " " << key[1] << " " << key[2]);
-        /* Delete current node */
-        m_octomap->deleteNode(key);
+    //     octomap::OcTreeKey key = it.getKey();
+    //     // ROS_INFO_STREAM("Key: " << key[0] << " " << key[1] << " " << key[2]);
+    //     /* Delete current node */
+    //     m_octomap->deleteNode(key);
 
-        // ROS_INFO_STREAM("Old coordinate: " << coord);
-        // m_octomap->updateNode(key, false, true); // This didn't worked
-        /* Push Node to ground */
-        coord.z() = min_Z;
-        /* Set it filled */
-        m_octomap->updateNode(coord, true, true);
-    }
+    //     // ROS_INFO_STREAM("Old coordinate: " << coord);
+    //     // m_octomap->updateNode(key, false, true); // This didn't worked
+    //     /* Push Node to ground */
+    //     coord.z() = min_Z;
+    //     /* Set it filled */
+    //     m_octomap->updateNode(coord, true, true);
+    // }
+
+
+
 
     m_octomap->updateInnerOccupancy();
     m_octomap->toMaxLikelihood();
