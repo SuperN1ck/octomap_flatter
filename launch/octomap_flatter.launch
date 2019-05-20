@@ -6,7 +6,7 @@
 
     <node pkg="octomap_flatter" type="flatten_octomap_service.py" name="flatten_octomap_service" output="screen" />
 
-    <node pkg="rosbag" type="play" name="rosbag_player" output="screen" args="--clock -d 1 -u 30 /home/nick/projects/intel_realsense_ws/test_v3.bag"/>
+    <node pkg="rosbag" type="play" name="rosbag_player" output="screen" args="--clock -d 1 -u 30 $(find octomap_flatter)/test_v3.bag"/>
     
     
     <!-- static_transform_publisher x y z qx qy qz qw frame_id child_frame_id  period_in_ms -->
