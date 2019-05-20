@@ -44,6 +44,8 @@ def get_surround(cont, idx, h, w):
             elif np.sum(neigh == x) > 1 and not (x == 0 or x == 255):
                 return x
     neigh = [x for x in neigh if x != 255]
+    if len(neigh) == 0:
+        return 0
     return max(neigh)
 
 def flatten(img):

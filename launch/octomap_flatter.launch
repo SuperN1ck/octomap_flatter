@@ -2,6 +2,8 @@
 
     <include file="$(find octomap_flatter)/launch/octomap.launch" />
 
+    <node type="rviz" name="rviz" pkg="rviz" args="-d $(find octomap_flatter)/rviz_config.rviz" />
+
     <node pkg="octomap_flatter" type="octomap_flatter_node" name="octomap_flatter" output="screen" />
 
     <node pkg="octomap_flatter" type="flatten_octomap_service.py" name="flatten_octomap_service" output="screen" />
@@ -35,5 +37,4 @@
         <param name="use_weighting" value="True"/>
     </node>
 
-      
 </launch>
