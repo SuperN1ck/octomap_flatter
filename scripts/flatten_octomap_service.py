@@ -18,7 +18,7 @@ print(imutils)
 
 import os 
 
-M_BINARY = 8
+M_BINARY = 10
 M_PEAK_RATIO = 5 # 1/PEAK_RATIO
 M_PEAK_PERCENT = 0.8 # 100% = 1.0
 
@@ -60,6 +60,10 @@ def flatten(img):
 
     global counter
     cv2.imwrite("/home/nick/output/" + str(counter) + "_img.png", img)
+
+    img = img.astype(np.uint8)
+    img = cv2.bilateralFilter(img, 4, 75, 75)
+    img = img.astype(int)
 
     # pad with some value (200) so that boxes that end outside the image are also considered
     img_pad = np.lib.pad(img, 2, 'constant', constant_values=200)
@@ -109,7 +113,7 @@ def flatten(img):
             cv2.drawContours(edge_pad, [c], -1, col, 1)
             cv2.fillPoly(edge_pad, pts =[c], color=col)
         
-        avg = [[0,0] for box in range(col-mx)]
+        avg = [[] for box in range(col-mx)]
         edge_fill = edge_pad[2:-2,2:-2]
         
         # sum up the real height values for pixels that belong to the same box
@@ -117,19 +121,22 @@ def flatten(img):
             if val == 255:
                 val = get_surround(edge_fill, idx, h, w)
                 edge_fill[idx] = val
-            if val > mx:
-                avg[val-mx-1][0] += img[idx]
-                avg[val-mx-1][1] += 1
+            if val > mx and img[idx] != 0:
+                avg[val-mx-1].append(img[idx])
         
         # calculate average height of each box
-        for a in avg:
-            if not a[1] == 0:
-                a[0] //= a[1]
+        for idx, a in enumerate(avg):
+            if len(a) < 1:
+                continue
+            avg[idx] = sorted(a)
         
         # fill in the final image with the average height
         for idx, val in np.ndenumerate(edge_fill):
             if val > mx:
-                fin[idx] = avg[val-mx-1][0]
+                if len(avg[val-mx-1]) == 0:
+                    fin[idx] = 0
+                else:    
+                    fin[idx] = avg[val-mx-1][int(len(avg[val-mx-1]) * 0.8)]
         
         # make ground level 0
         # msk = ma.masked_equal(edge_fill, 0).mask
@@ -139,7 +146,7 @@ def flatten(img):
         #     fin = np.multiply(fin, ~msk)
 
         # May be needed later for masking / slopes
-	    # msk = ma.masked_where(1 <= edge_fill <= mx, edge_fill).mask
+        # msk = ma.masked_where(1 <= edge_fill <= mx, edge_fill).mask
         # unique, counts = np.unique(gnd, return_counts=True)
         # dict(zip(unique, counts))
 
