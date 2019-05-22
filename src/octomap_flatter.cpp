@@ -27,6 +27,7 @@ OctomapFlatter::OctomapFlatter(ros::NodeHandle &nh, ros::NodeHandle &nh_private)
     octomap_pub_ = nh.advertise<octomap_msgs::Octomap>("/octomap_flattened", 10);
     bounding_box_pub_ = nh.advertise<visualization_msgs::Marker>("/octomap_flatter_bounding_box", 10);
     height_image_pub_ = nh.advertise<sensor_msgs::Image>("/height_image", 10);
+    height_result_pub_ = nh.advertise<sensor_msgs::Image>("/height_result", 10);
     /* Parameters */
     dynamic_reconfigure::Server<octomap_flatter::OctoFlatterConfig>::CallbackType f;
     f = boost::bind(&OctomapFlatter::dynamicParameterCallback, this, _1, _2);
@@ -209,6 +210,7 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     if (cluster_service_.call(srv))
     {
         service_output = srv.response.output;
+        height_result_pub_.publish(service_output);
         ROS_INFO_STREAM("Service returned image of size " << service_output.height << " x " << service_output.width);
     }
     else
@@ -216,7 +218,11 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
         ROS_ERROR("Failed to call flattening service");
         return;
     }
-
+    // int x = (it.getX() - start_box.x()) / resolution;
+    // int y = (it.getY() - start_box.y()) / resolution;
+    // int image_idx = y * image_width + x;
+    // uint8_t z = ((it.getZ() - start_box.z()) * 100) + min_image_height;
+    int asdf = 0;
     for (uint32_t image_y = 0; image_y < service_output.height; ++image_y)
     {
         for (uint32_t image_x = 0; image_x < service_output.width; ++image_x)
@@ -224,13 +230,16 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
             float x_coord = (image_x * resolution) + start_box.x();
             float y_coord = (image_y * resolution) + start_box.y();
             float z_coord;
-            int image_idx = image_y * service_output.step + image_y;
-
+            int image_idx = image_y * service_output.step + image_x;
+            if (image_idx > image_width * image_height || image_idx < 0) {
+                asdf ++;
+                if (asdf < 20)
+                    ROS_INFO_STREAM("x y " << image_x << " " << image_y);
+            }
             uint8_t image_z = service_output.data[image_idx];
             if (image_z < 10)
-                z_coord = 0;
-            else
-                z_coord = (service_output.data[image_idx] - min_image_height) / 100;
+                continue;
+            z_coord = ((service_output.data[image_idx] - min_image_height) / 100)  + start_box.z();
             
             octomap::point3d coord(x_coord, y_coord, z_coord);
             /* Set it filled */

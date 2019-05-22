@@ -17,6 +17,11 @@ import scipy.ndimage
 print(imutils)
 
 import os 
+
+M_BINARY = 8
+M_PEAK_RATIO = 5 # 1/PEAK_RATIO
+M_PEAK_PERCENT = 0.8 # 100% = 1.0
+
 counter = 0
 global counter
 
@@ -66,7 +71,7 @@ def flatten(img):
 
     # make all edges value to 255. TODO: How will we choose the threshold?
     edge_pad = edge_pad.astype(np.uint8)
-    edge_pad = cv2.threshold(edge_pad, 5, 255, cv2.THRESH_BINARY)[1]
+    edge_pad = cv2.threshold(edge_pad, M_BINARY, 255, cv2.THRESH_BINARY)[1]
 
     # get contours from the images made up of edges
     contours = cv2.findContours(edge_pad, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
@@ -89,13 +94,13 @@ def flatten(img):
                 del pix_dict[i]
         pix_list = list(pix_dict.items())
         rng = int(pix_list[-1][0] - pix_list[0][0])
-        rng //= 5
+        rng //= M_PEAK_RATIO
         peak = int(max(pix_dict, key=pix_dict.get))
         peak_sum = 0
         for i in range(peak-rng,peak+rng+1):
             if i in pix_dict:
                 peak_sum += pix_dict[i]
-        if not float(peak_sum) / sum(pix_dict.values()) > 0.8:
+        if not float(peak_sum) / sum(pix_dict.values()) > M_PEAK_PERCENT:
             contours = contours[1:]
 
         # fill in the polygon of the edges with the same height (label)
