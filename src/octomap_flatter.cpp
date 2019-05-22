@@ -154,7 +154,7 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
         /*  Normalize Z Value in box and scale up to 255 
             We need to add the resolution as the centers might be above the camera */
         // uint8_t z = (it.getZ() - start_box.z()) / (end_box.z() + resolution - start_box.z()) * 255;
-        uint8_t z = ((it.getZ() - start_box.z()) * 100) + min_image_height;
+        uint8_t z = octomap_to_image_height(it.getZ(), min_image_height, start_box.z());
     
         /* "+z" to actually print it (uint8_t is typedef char* --> no + results in as interpreting as a char*) */
         // ROS_INFO_STREAM("x, y: " << x << "x" << y << " z: " << +z); 
@@ -219,32 +219,40 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
         ROS_ERROR("Failed to call flattening service");
         return;
     }
-    // int x = (it.getX() - start_box.x()) / resolution;
-    // int y = (it.getY() - start_box.y()) / resolution;
-    // int image_idx = y * image_width + x;
-    // uint8_t z = ((it.getZ() - start_box.z()) * 100) + min_image_height;
-    int asdf = 0;
+
+    uint8_t min_img_z = std::numeric_limits<uint8_t>::max();
+    for (auto const & it : service_output.data)
+    {
+        if (it < min_image_height)
+            continue;
+        min_img_z = std::min(it, min_img_z);
+    }
+
+    ROS_INFO_STREAM("Minimal Value in image above " << min_image_height << " is: " << +min_img_z);
+    
     for (uint32_t image_y = 0; image_y < service_output.height; ++image_y)
     {
         for (uint32_t image_x = 0; image_x < service_output.width; ++image_x)
         {
-            float x_coord = (image_x * resolution) + start_box.x();
-            float y_coord = (image_y * resolution) + start_box.y();
-            float z_coord;
+            float x_coord = (image_x * resolution) + start_box.x() - resolution / 2;
+            float y_coord = (image_y * resolution) + start_box.y() - resolution / 2;
             int image_idx = image_y * service_output.step + image_x;
-            if (image_idx > image_width * image_height || image_idx < 0) {
-                asdf ++;
-                if (asdf < 20)
-                    ROS_INFO_STREAM("x y " << image_x << " " << image_y);
-            }
             uint8_t image_z = service_output.data[image_idx];
-            if (image_z < 10)
+
+            if (image_z < min_image_height)
                 continue;
-            z_coord = ((service_output.data[image_idx] - min_image_height) / 100)  + start_box.z();
-            
-            octomap::point3d coord(x_coord, y_coord, z_coord);
-            /* Set it filled */
-            m_octomap->updateNode(coord, true, true);
+
+            for (uint8_t fill_z = min_img_z; fill_z < image_z; ++fill_z)
+            {
+                float z_coord = image_to_octomap_height(fill_z, min_image_height, start_box.z());
+                
+                if (z_coord < min_Z)
+                    continue;
+                
+                octomap::point3d coord(x_coord, y_coord, z_coord);
+                /* Fill in octomap */
+                m_octomap->updateNode(coord, true, true);
+            }
         }
     }
 

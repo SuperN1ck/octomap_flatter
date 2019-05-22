@@ -19,6 +19,19 @@
 
 namespace octflat
 {
+
+uint8_t octomap_to_image_height(double oct, double min_image_height, double start_box)
+{
+    return ((oct - start_box) * 100) + min_image_height;
+}
+
+double image_to_octomap_height(uint8_t img, double min_image_height, double start_box)
+{
+    return ((img - min_image_height) / 100)  + start_box;
+}
+
+
+
 typedef message_filters::sync_policies::ApproximateTime<octomap_msgs::Octomap,
                                                         nav_msgs::OccupancyGrid>
     SyncPolicy;
