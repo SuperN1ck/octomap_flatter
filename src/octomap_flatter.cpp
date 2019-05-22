@@ -123,8 +123,8 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     /* Create data array */
     // TODO Check for correct frame direction
     double resolution = m_octomap->getResolution();
-    uint32_t image_width = ((end_box.x() - start_box.x()) / resolution) + 2; // We need to add 2 in case the center is out of the bounding box
-    uint32_t image_height = ((end_box.y() - start_box.y()) / resolution) + 2;
+    uint32_t image_width = ((end_box.x() - start_box.x()) / resolution) + 1; // We need to add 1 in case the center is out of the bounding box
+    uint32_t image_height = ((end_box.y() - start_box.y()) / resolution) + 1;
 
     ROS_INFO_STREAM("Image Width: " << image_width << " Image Height: " << image_height << " Res: " << resolution);
 
@@ -139,15 +139,16 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
             continue;
         cnt ++;
         
-        int x = (it.getX() - start_box.x()) / resolution;
-        int y = (it.getY() - start_box.y()) / resolution;
+        int x = (it.getX() - start_box.x() + resolution / 2) / resolution;
+        int y = (it.getY() - start_box.y() + resolution / 2) / resolution;
         int image_idx = y * image_width + x;
 
-        if (x == image_width || y == image_height)
+        if (x >= image_width || y >= image_height)
         {
-            ROS_INFO_STREAM("Invalid idx" << std::endl 
+            ROS_DEBUG_STREAM("Invalid idx" << std::endl 
                 << "x: " << x << " it.getX(): " << it.getX() << std::endl
                 << "y: " << y << " it.getY(): " << it.getY() << std::endl);
+            continue;
         } 
 
         /*  Normalize Z Value in box and scale up to 255 
