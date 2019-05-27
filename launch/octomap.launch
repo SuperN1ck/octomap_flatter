@@ -19,7 +19,8 @@
     <!-- <param name="filter_ground" value="true" /> --> 
 
     <!-- topic from where pointcloud2 messages are subscribed -->
-    <!-- <remap from="/xxx" to="/cloud_in" /> -->
+    <!-- <remap from="/cloud_in" to="/camera/depth_registered/points" /> -->
+    <remap from="/cloud_in" to="/dvo_cloud_in" />
     
   </node>
 </launch>

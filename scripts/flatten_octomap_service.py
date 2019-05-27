@@ -181,7 +181,7 @@ def call_flatten(req):
 
 rospy.init_node('flatten_octomap_server')
 s = rospy.Service('flatten_octomap', OctoImage, call_flatten)
-print("Starting flatten_octomap_server")
+rospy.loginfo("Starting flatten_octomap_server")
 
 import sys
 print(sys.executable)

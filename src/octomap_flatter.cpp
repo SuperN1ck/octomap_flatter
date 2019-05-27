@@ -36,7 +36,7 @@ OctomapFlatter::OctomapFlatter(ros::NodeHandle &nh, ros::NodeHandle &nh_private)
     cluster_service_ = nh.serviceClient<octomap_flatter::OctoImage>("flatten_octomap");
 
 
-    ROS_INFO("started octomap_flatter ...");
+    ROS_INFO("Started octomap_flatter ...");
 }
 
 void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octomap_msg,

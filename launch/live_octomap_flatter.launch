@@ -6,10 +6,10 @@
 
     <node pkg="octomap_flatter" type="octomap_flatter_node" name="octomap_flatter" output="screen" />
 
-    <node pkg="octomap_flatter" type="flatten_octomap_service.py" name="flatten_octomap_service" output="screen" />
+    <node pkg="octomap_flatter" type="flatten_octomap_service.py" name="flatten_octomap_service" output="screen" />    
 
-    <node pkg="rosbag" type="play" name="rosbag_player" output="screen" args="--clock -d 1 -u 30 $(find octomap_flatter)/test_v3.bag"/>
-    
+    <!-- <include file="$(find realsense2_camera)/launch/rs_rgbd.launch" /> -->
+
     
     <!-- static_transform_publisher x y z qx qy qz qw frame_id child_frame_id  period_in_ms -->
     <!-- Temporarly place this here -->
@@ -23,7 +23,7 @@
     <!-- CAMERA LINK -->
     <!-- 0 Degree -->
     <!-- rosrun tf static_transform_publisher 0 0 0.5 0 0 0 1 base_link camera_link 100 -->
-    <!-- <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args="0 0 0.5 0 0 0 1 base_link camera_link 100" /> -->
+    <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args="0 0 0.5 0 0 0 1 base_link camera_link 100" />
     <!-- 45 Degree -->
     <!-- rosrun tf static_transform_publisher 0 0 0.5 0 0.383 0 0.924 base_link camera_link 100 -->
     <!-- <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args="0 0 0.5 0 0.383 0 0.924 base_link camera_link 100" /> -->
@@ -31,9 +31,7 @@
     <!-- rosrun tf static_transform_publisher 0 0 0.5 0 0.707 0 0.707 base_link camera_link 100 -->
     <!-- <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args=" 0 0 0.5 0 0.707 0 0.707 base_link camera_link 100" /> -->
     <!-- 88.5 Degree -->
-    <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args=" 0 0 0.5 0 0.698 0 0.716 base_link camera_link 100" />
-
-    <param name="/use_sim_time" value="True"/>
+    <!-- <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args=" 0 0 0.5 0 0.698 0 0.716 base_link camera_link 100" /> -->
     
     <node pkg="dvo_ros" type="camera_tracker" name="dvo_slam_node" output="screen">
         <param name="run_dense_tracking" value="True"/>
@@ -41,23 +39,12 @@
         <param name="use_weighting" value="True"/>
     </node>
 
-    <!-- VOXEL FILTER POINTCLOUD -->
-
-    <node pkg="octomap_flatter" type="cloud_voxel_filter_node" name="cloud_voxel_filter" output="screen"
-            args="/dvo_cloud_in /voxel_filtered_cloud 5"/>
-
-
-    <!-- CONVERTS DEPTH IMAGE TO POINTCLOUD -->
-
-    <node pkg="octomap_flatter" type="filter_depth_service.py" name="filter_depth_service" output="screen" 
-            args="/camera/aligned_depth_to_color/image_raw /filtered_depth_image"/>
-
-    <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager"/>
+    <!-- <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager"/>
 
     <node pkg="nodelet" type="nodelet" name="cloudify"
             args="load depth_image_proc/point_cloud_xyz standalone_nodelet">
         <remap from="points" to="depth_filtered_cloud"/>
         <remap from="image_rect" to="filtered_depth_image"/>
         <remap from="camera_info" to="camera/depth/camera_info"/>
-    </node>
+    </node> -->
 </launch>

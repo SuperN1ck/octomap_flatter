@@ -10,6 +10,12 @@ add_compile_options(-std=c++11)
 find_package(catkin REQUIRED COMPONENTS roscpp octomap_msgs message_filters dynamic_reconfigure rospy message_generation std_msgs geometry_msgs tf catkin_virtualenv)
 find_package(cmake_modules REQUIRED)
 
+# PCL
+find_package(PCL REQUIRED)
+include_directories( ${catkin_INCLUDE_DIRS} ${PCL_INCLUDE_DIRS})
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
+
 # Octomap
 find_package(octomap 1.6 REQUIRED)
 include_directories(SYSTEM BEFORE ${OCTOMAP_INCLUDE_DIRS})
@@ -56,7 +62,7 @@ add_message_files(
 )
 
 ## Generate services in the 'srv' folder
-	add_service_files(
+add_service_files(
 	FILES
 	OctoImage.srv
 )
@@ -143,6 +149,7 @@ add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EX
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(${PROJECT_NAME}_node src/octomap_flatter_node.cpp)
+add_executable(cloud_voxel_filter_node src/cloud_voxel_filter_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -155,9 +162,8 @@ add_executable(${PROJECT_NAME}_node src/octomap_flatter_node.cpp)
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(${PROJECT_NAME}_node
-   ${PROJECT_NAME}
-)
+target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME})
+target_link_libraries(cloud_voxel_filter_node ${PCL_LIBRARIES} ${catkin_LIBRARIES})
 
 catkin_generate_virtualenv()
 
