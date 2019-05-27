@@ -49,8 +49,13 @@
 
     <!-- CONVERTS DEPTH IMAGE TO POINTCLOUD -->
 
+    <node pkg="octomap_flatter" type="tf_alias_node.py" name="tf_alias" output="screen" 
+            args="/base_link_estimate /camera_depth_optical_frame_estimate /base_link /camera_depth_optical_frame"/>
+
+    <!-- <node pkg="octomap_flatter" type="depth_image_filter_node.py" name="filter_depth_service" output="screen" 
+            args="/camera/aligned_depth_to_color/image_raw /filtered_depth_image"/> -->
     <node pkg="octomap_flatter" type="depth_image_filter_node.py" name="filter_depth_service" output="screen" 
-            args="/camera/aligned_depth_to_color/image_raw /filtered_depth_image"/>
+            args="/camera/depth/image_rect_raw /filtered_depth_image"/>
 
     <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager"/>
 

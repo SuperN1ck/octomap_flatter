@@ -32,6 +32,7 @@ class SubThenFilter:
         try:
             msg = self.bridge.cv2_to_imgmsg(cv_image, "passthrough")
             data.data = msg.data
+            data.header.frame_id = "camera_depth_optical_frame_estimate"
             self.pub.publish(data)
         except CvBridgeError as e:
             print(e)
