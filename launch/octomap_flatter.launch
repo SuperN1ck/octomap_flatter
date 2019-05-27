@@ -49,7 +49,7 @@
 
     <!-- CONVERTS DEPTH IMAGE TO POINTCLOUD -->
 
-    <node pkg="octomap_flatter" type="filter_depth_service.py" name="filter_depth_service" output="screen" 
+    <node pkg="octomap_flatter" type="depth_image_filter_node.py" name="filter_depth_service" output="screen" 
             args="/camera/aligned_depth_to_color/image_raw /filtered_depth_image"/>
 
     <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager"/>
