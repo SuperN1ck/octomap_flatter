@@ -181,10 +181,8 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
                     int img_y = sub_y - start_y;
                     int image_idx = img_y * image_width + img_x;
 
-                    if (img_x < 0 || img_x >= image_width || img_y < 0 || img_y >= image_height){
-                        ROS_INFO_STREAM("Not chosen (Part of larger voxel): " << img_x << " " << img_y);
+                    if (img_x < 0 || img_x >= image_width || img_y < 0 || img_y >= image_height)
                         continue;
-                    }
                     
                     data[image_idx] = std::max(data[image_idx], z);
                 }
@@ -267,22 +265,58 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
         {
             float x_coord = (image_x * resolution) + start_box.x() - resolution / 2;
             float y_coord = (image_y * resolution) + start_box.y() - resolution / 2;
+            // float x_coord = (image_x + start_x + 0.5) * resolution;
+            // float y_coord = (image_y + start_y + 0.5) * resolution;
             int image_idx = image_y * service_output.step + image_x;
             uint8_t image_z = service_output.data[image_idx];
 
             if (image_z < min_image_height)
                 continue;
 
-            for (uint8_t fill_z = min_img_z; fill_z < image_z; ++fill_z)
+            bool is_edge = false;
+
+            for (int i = -1; i < 2; i++)
             {
-                float z_coord = image_to_octomap_height(fill_z, min_image_height, start_box.z());
+                for (int j = -1; j < 2; j++)
+                {
+                    int nx = image_x+i;
+                    int ny = image_y+j;
+                    if (nx < 0 || nx >= service_output.width || ny < 0 || ny >= service_output.height) // point is at edge of image
+                    {
+                        is_edge = true;
+                        break;
+                    }
+                    else if (service_output.data[ny * service_output.step + nx] < image_z) // neighbour point is lower than me
+                    {
+                        is_edge = true;
+                        break;
+                    }
+                }
+                if (is_edge)
+                    break;
+                else
+                {
+                    float z_coord = image_to_octomap_height(image_z, min_image_height, start_box.z());
+                    if (z_coord < min_Z)
+                        continue;
+                    octomap::point3d coord(x_coord, y_coord, z_coord);
+                    m_octomap->updateNode(coord, true, true);
+                }
                 
-                if (z_coord < min_Z)
-                    continue;
-                
-                octomap::point3d coord(x_coord, y_coord, z_coord);
-                /* Fill in octomap */
-                m_octomap->updateNode(coord, true, true);
+            }
+            if (is_edge)
+            {
+                for (uint8_t fill_z = min_img_z; fill_z <= image_z; ++fill_z)
+                {
+                    float z_coord = image_to_octomap_height(fill_z, min_image_height, start_box.z());
+                    
+                    if (z_coord < min_Z)
+                        continue;
+                    
+                    octomap::point3d coord(x_coord, y_coord, z_coord);
+                    /* Fill in octomap */
+                    m_octomap->updateNode(coord, true, true);
+                }
             }
         }
     }

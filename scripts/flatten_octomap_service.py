@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
+from ransac_lib import *
 from octomap_flatter.srv import *
 import rospy
 
-# import matplotlib; matplotlib.use('SVG')
+import matplotlib;
 import matplotlib.pyplot as plt
 
 import numpy as np
@@ -14,159 +15,85 @@ import imutils
 import scipy
 import scipy.ndimage
 
-print(imutils)
+from sklearn.cluster import AgglomerativeClustering, KMeans, MeanShift, estimate_bandwidth
+from sklearn.neighbors import kneighbors_graph
 
 import os 
 
-M_BINARY = 10
-M_PEAK_RATIO = 5 # 1/PEAK_RATIO
-M_PEAK_PERCENT = 0.8 # 100% = 1.0
+def plot_plane(a, b, c, d, h, w):
+	xx, yy = np.mgrid[:h, :w]
+	return xx, yy, (-d - a * xx - b * yy) / c
 
-counter = 0
-global counter
+def augment(points):
+	aug_pts = np.ones((len(points), 4))
+	aug_pts[:, :3] = points
+	return aug_pts
 
-# gets the most likely value from its surround pixels
-def get_surround(cont, idx, h, w):
-    if idx in [(0,0),(0,w-1),(h-1,0),(h-1,w-1)]:
-        if idx == (0,0):
-            neigh = cont[:2,:2].ravel()
-        elif idx == (0,w-1):
-            neigh = cont[:2,-2:].ravel()
-        elif idx == (h-1,0):
-            neigh = cont[-2:,:2].ravel()
-        else:
-            neigh = cont[-2:,-2:].ravel()
-    elif idx[0] in [0, h-1]:
-        neigh = cont[idx[0],idx[1]-1:idx[1]+2].ravel()
-    elif idx[1] in [0, w-1]:
-        neigh = cont[idx[0]-1:idx[0]+2,idx[1]].ravel()
-    else:
-        neigh = cont[idx[0]-1:idx[0]+2, idx[1]-1:idx[1]+2].ravel()
-        neigh = np.delete(neigh,[4])
-        for x in neigh:
-            if np.sum(neigh == x) == 3 and not (x == 0 or x == 255):
-                return x
-            elif np.sum(neigh == x) > 1 and not (x == 0 or x == 255):
-                return x
-    neigh = [x for x in neigh if x != 255]
-    if len(neigh) == 0:
-        return 0
-    return max(neigh)
+def estimate(points):
+	aug_pts = augment(points[:3])
+	return np.linalg.svd(aug_pts)[-1][-1, :]
+
+def is_inlier(coeffs, point, threshold):
+	return np.abs(coeffs.dot(augment([point]).T)) < threshold
 
 def flatten(img):
+    points = []
     h, w = np.shape(img)
-    mx = int(np.max(img))
-    fin = img.copy()
+    for i in range(h):
+        for j in range(w):
+            if not img[i,j] == 0:
+                points.append([i,j,img[i,j]])
 
-    global counter
-    cv2.imwrite("/home/nick/output/" + str(counter) + "_img.png", img)
+    points = np.asarray(points)
+    point_list = list(points)
 
-    img = img.astype(np.uint8)
-    img = cv2.bilateralFilter(img, 4, 75, 75)
-    img = img.astype(int)
+    # RANSAC
+    N = len(point_list)
+    max_iterations = 100
+    goal_inliers = N * 0.3
+    m, ic = run_ransac(point_list, estimate, lambda x, y: is_inlier(x, y, 0.0005), 3, goal_inliers, max_iterations)
+    gnd_list, obj_list = get_others(point_list, m, lambda x, y: is_inlier(x, y, 0.03))
 
-    # pad with some value (200) so that boxes that end outside the image are also considered
-    img_pad = np.lib.pad(img, 2, 'constant', constant_values=200)
+    a, b, c, d = m
+    xx, yy, zz = plot_plane(a, b, c, d, h, w)
+    gnd_height = int(round(np.average(zz)))
 
-    # get the edges of the image
-    horizontal = scipy.ndimage.sobel(img_pad, 0)
-    vertical = scipy.ndimage.sobel(img_pad, 1)
-    edge_pad = np.hypot(horizontal, vertical)
+    if len(gnd_list):
+        gnd = np.asarray(gnd_list)
+        for g in gnd:
+            img[g[0],g[1]] = gnd_height
+    if len(obj_list):
+        obj = np.asarray(obj_list)
+        obj_2d = obj[:,:2]
 
-    # make all edges value to 255. TODO: How will we choose the threshold?
-    edge_pad = edge_pad.astype(np.uint8)
-    edge_pad = cv2.threshold(edge_pad, M_BINARY, 255, cv2.THRESH_BINARY)[1]
+        if len(obj_list) > N * 0.1:
+            #cluster
+            connectivity = kneighbors_graph(obj_2d, n_neighbors=50, include_self=False)			
+            estimator = AgglomerativeClustering(linkage='ward', connectivity=connectivity)
+            estimator.fit(obj_2d)
+            labels = estimator.labels_
+            cluster_list = [[] for c in range(estimator.n_clusters)]
+            for idx, val in enumerate(obj_list):
+                cluster_list[labels[idx]].append(val)
 
-    # get contours from the images made up of edges
-    contours = cv2.findContours(edge_pad, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-    contours = imutils.grab_contours(contours)
-    contours = [c for c in contours if len(c) >= 8]
-    contours = sorted(contours, key = cv2.contourArea, reverse = True)
-
-    if len(contours) >= 1:
-        col = mx
-        # first check the biggest polygon (is it a slope?)
-        msk = np.zeros(np.shape(img_pad))
-        cv2.fillPoly(msk, pts =[c], color=1)
-        for c in contours[1:]:
-            cv2.fillPoly(msk, pts =[c], color=0)
-        gnd = np.multiply(img_pad,msk)
-        k, v = np.unique(gnd, return_counts=True)
-        pix_dict = dict(zip(k,v))
-        for i in (0,200,255):
-            if i in pix_dict:
-                del pix_dict[i]
-        pix_list = list(pix_dict.items())
-        rng = int(pix_list[-1][0] - pix_list[0][0])
-        rng //= M_PEAK_RATIO
-        peak = int(max(pix_dict, key=pix_dict.get))
-        peak_sum = 0
-        for i in range(peak-rng,peak+rng+1):
-            if i in pix_dict:
-                peak_sum += pix_dict[i]
-        if not float(peak_sum) / sum(pix_dict.values()) > M_PEAK_PERCENT:
-            contours = contours[1:]
-
-        # fill in the polygon of the edges with the same height (label)
-        for c in contours:
-            col += 1
-            cv2.drawContours(edge_pad, [c], -1, col, 1)
-            cv2.fillPoly(edge_pad, pts =[c], color=col)
-        
-        avg = [[] for box in range(col-mx)]
-        edge_fill = edge_pad[2:-2,2:-2]
-        
-        # sum up the real height values for pixels that belong to the same box
-        for idx, val in np.ndenumerate(edge_fill):
-            if val == 255:
-                val = get_surround(edge_fill, idx, h, w)
-                edge_fill[idx] = val
-            if val > mx and img[idx] != 0:
-                avg[val-mx-1].append(img[idx])
-        
-        # calculate average height of each box
-        for idx, a in enumerate(avg):
-            if len(a) < 1:
-                continue
-            avg[idx] = sorted(a)
-        
-        # fill in the final image with the average height
-        for idx, val in np.ndenumerate(edge_fill):
-            if val > mx:
-                if len(avg[val-mx-1]) == 0:
-                    fin[idx] = 0
-                else:    
-                    fin[idx] = avg[val-mx-1][int(len(avg[val-mx-1]) * 0.8)]
-        
-        # make ground level 0
-        # msk = ma.masked_equal(edge_fill, 0).mask
-        # gnd = np.multiply(img,msk)
-        # avg = np.sum(gnd) / float(np.sum(msk))
-        # if avg <= 1:
-        #     fin = np.multiply(fin, ~msk)
-
-        # May be needed later for masking / slopes
-        # msk = ma.masked_where(1 <= edge_fill <= mx, edge_fill).mask
-        # unique, counts = np.unique(gnd, return_counts=True)
-        # dict(zip(unique, counts))
-
-    # fig, ax = plt.subplots(nrows=4, sharex=True, sharey=True, figsize=(6, 12))
-    # 
-    # ax[0].imshow(img,cmap='gray')
-    # ax[1].imshow(fin,cmap='gray')
-    # ax[2].imshow(qwer,cmap='gray')
-    # ax[3].imshow(asdf,cmap='gray')
-    # 
-    # for a in ax:
-    #     a.axis('off')
-    # 
-    # plt.tight_layout()
-    # plt.show()
-
-    cv2.imwrite("/home/nick/output/" + str(counter) + "_fin.png", fin)
-    counter += 1
-
-    return fin
+            for idx, cluster in enumerate(cluster_list):
+                N = len(cluster)
+                cluster = np.asarray(cluster)
+                estimator = MeanShift(bin_seeding=True)
+                estimator.fit(cluster)
+                labels = estimator.labels_
+                lab_cnt = {}
+                for l in labels:
+                    if not l in lab_cnt:
+                        lab_cnt[l] = 0
+                    lab_cnt[l] += 1
+                for l in lab_cnt:
+                    if lab_cnt[l] / float(N) > 0.2:
+                        new_clus = cluster[labels == l]
+                        new_height = int(np.average(new_clus[:,2]))
+                        for p in new_clus:
+                            img[p[0],p[1]] = new_height
+    return img
 
 def call_flatten(req):
     # img = np.array(req.input.data).reshape(req.input.height, req.input.width)
