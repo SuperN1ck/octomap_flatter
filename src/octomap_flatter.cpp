@@ -123,9 +123,16 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     /* Create data array */
     // TODO Check for correct frame direction
     double resolution = m_octomap->getResolution();
-    uint32_t image_width = ((end_box.x() - start_box.x()) / resolution) + 1; // We need to add 1 in case the center is out of the bounding box
-    uint32_t image_height = ((end_box.y() - start_box.y()) / resolution) + 1;
+    // uint32_t image_width = ((end_box.x() - start_box.x()) / resolution) + 1; // We need to add 1 in case the center is out of the bounding box
+    // uint32_t image_height = ((end_box.y() - start_box.y()) / resolution) + 1;
+    int start_x = floor(start_box.x() / resolution);
+    int start_y = floor(start_box.y() / resolution);
+    int end_x = ceil(end_box.x() / resolution);
+    int end_y = ceil(end_box.y() / resolution);
 
+    uint32_t image_width = end_x - start_x;
+    uint32_t image_height = end_y - start_y;
+ 
     ROS_INFO_STREAM("Image Width: " << image_width << " Image Height: " << image_height << " Res: " << resolution);
 
     // /* Taken from sensor_msgs/Images documentation: uint8[] data # actual matrix data, size is (step * rows) */
@@ -138,27 +145,51 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
         if (m_octomap->search(it.getCoordinate())->getOccupancy() < m_octomap->getOccupancyThres())
             continue;
         cnt ++;
-        
-        int x = (it.getX() - start_box.x() + resolution / 2) / resolution;
-        int y = (it.getY() - start_box.y() + resolution / 2) / resolution;
-        int image_idx = y * image_width + x;
-
-        if (x >= image_width || y >= image_height)
-        {
-            ROS_DEBUG_STREAM("Invalid idx" << std::endl 
-                << "x: " << x << " it.getX(): " << it.getX() << std::endl
-                << "y: " << y << " it.getY(): " << it.getY() << std::endl);
-            continue;
-        } 
 
         /*  Normalize Z Value in box and scale up to 255 
             We need to add the resolution as the centers might be above the camera */
         // uint8_t z = (it.getZ() - start_box.z()) / (end_box.z() + resolution - start_box.z()) * 255;
         uint8_t z = octomap_to_image_height(it.getZ(), min_image_height, start_box.z());
-    
-        /* "+z" to actually print it (uint8_t is typedef char* --> no + results in as interpreting as a char*) */
-        // ROS_INFO_STREAM("x, y: " << x << "x" << y << " z: " << +z); 
-        data[image_idx] = std::max(data[image_idx], z);
+
+        int oct_x = floor(it.getX() / resolution);
+        int oct_y = floor(it.getY() / resolution);
+        int siz = it.getSize() / resolution;
+        if (siz == 1)
+        {
+            int img_x = oct_x - start_x;
+            int img_y = oct_y - start_y;
+            int image_idx = img_y * image_width + img_x;
+
+            if (img_x < 0 || img_x >= image_width || img_y < 0 || img_y >= image_height){
+                ROS_INFO_STREAM("Not chosen: " << img_x << " " << img_y);
+                continue;
+            }
+
+            /* "+z" to actually print it (uint8_t is typedef char* --> no + results in as interpreting as a char*) */
+            // ROS_INFO_STREAM("x, y: " << x << "x" << y << " z: " << +z); 
+            data[image_idx] = std::max(data[image_idx], z);
+        }
+        else
+        {
+            for (int i = -siz/2; i < siz/2; i += 1)
+            {
+                for (int j = -siz/2; j < siz/2; j += 1)
+                {
+                    int sub_x = oct_x + i;
+                    int sub_y = oct_y + j;
+                    int img_x = sub_x - start_x;
+                    int img_y = sub_y - start_y;
+                    int image_idx = img_y * image_width + img_x;
+
+                    if (img_x < 0 || img_x >= image_width || img_y < 0 || img_y >= image_height){
+                        ROS_INFO_STREAM("Not chosen (Part of larger voxel): " << img_x << " " << img_y);
+                        continue;
+                    }
+                    
+                    data[image_idx] = std::max(data[image_idx], z);
+                }
+            }
+        }
 
         octomap::OcTreeKey key = it.getKey();
         /* Delete current node */
