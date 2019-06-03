@@ -42,13 +42,12 @@ class SubThenFilter:
         uint16_to_uint8_scaling = 255.0/max_val
         cv_image = cv2.convertScaleAbs(cv_image, alpha=uint16_to_uint8_scaling)
         max_threshold_uint8 = self.max_threshold_uint16 * uint16_to_uint8_scaling
-        print(max_threshold_uint8)
 
         initial_mask = cv_image > max_threshold_uint8
 
         if self.use_median_blur:
             # cv_image = cv2.medianBlur(cv_image, self.median_blur_size)
-            for filter_size in [3, 5, 13, 25, 51, 101]: # Gradually incresae filter size
+            for filter_size in [5, 33, 81]:#[3, 5, 13, 25, 51, 101]: # Gradually incresae filter size
                 mask = cv_image > max_threshold_uint8
                 if not mask.any(): # Break early if all hole were covered
                     break
