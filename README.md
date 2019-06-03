@@ -17,7 +17,7 @@ $ mkdir -p ~/octomap_flatter_ws/src
 $ cd ~/octomap_flatter_ws/src/
 $ catkin_init_workspace
 ```
-We assume that `intel-realsense`-ROS package is already installed and avaivable in the workspace.
+We assume that [`intel-realsense`](https://github.com/IntelRealSense/realsense-ros)-ROS package is already installed and avaivable in the workspace.
 ### Installing DVO SLAM
 We kindly refer to our other fork of this projcet located at: https://github.com/SuperN1ck/dvo_slam/tree/kinetic-devel
 
@@ -45,6 +45,6 @@ $ source ../devel/setup.bash
 ## Running
 Once your camera is running you can use our launch-file
 ```
-$ roslaunch octomap_flatter octomap_flattening 
+$ roslaunch octomap_flatter octomap_flatter.launch 
 $ rviz -d rviz_config.rviz
 ```
