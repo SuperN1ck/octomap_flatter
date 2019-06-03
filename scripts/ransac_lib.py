@@ -1,4 +1,5 @@
 import random
+import rospy
 
 def run_ransac(data, estimate, is_inlier, sample_size, goal_inliers, max_iterations, stop_at_goal=True, random_seed=None):
     best_ic = 0
@@ -18,7 +19,7 @@ def run_ransac(data, estimate, is_inlier, sample_size, goal_inliers, max_iterati
             best_model = m
             if ic > goal_inliers and stop_at_goal:
                 break
-    print('total: {}, at iteration: {}, explains: {} out of: {}'.format(i+1, best_i, best_ic, len(data)))
+    rospy.logdebug('total: {}, at iteration: {}, explains: {} out of: {}'.format(i+1, best_i, best_ic, len(data)))
     return best_model, best_ic
 
 def get_others(data, model, is_inlier):

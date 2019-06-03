@@ -42,11 +42,11 @@ OctomapFlatter::OctomapFlatter(ros::NodeHandle &nh, ros::NodeHandle &nh_private)
 void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octomap_msg,
                                      const nav_msgs::OccupancyGrid::ConstPtr &occupancy_grid_msg)
 {
-    ROS_INFO("Flattening Octomap");
+    ROS_DEBUG_STREAM("Flattening Octomap");
     // http://docs.ros.org/kinetic/api/octomap_msgs/html/msg/Octomap.html
     octomap::AbstractOcTree *m_abstract_octomap = octomap_msgs::fullMsgToMap(*octomap_msg);
     octomap::OcTree *m_octomap = static_cast<octomap::OcTree *>(m_abstract_octomap);
-    ROS_INFO_STREAM("Received tree with " << m_octomap->calcNumNodes() << " nodes");
+    ROS_DEBUG_STREAM("Received tree with " << m_octomap->calcNumNodes() << " nodes");
 
     double min_Z = std::numeric_limits<double>::max();
 
@@ -58,7 +58,7 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
         min_Z = it.getZ();
     }
 
-    ROS_INFO_STREAM("min_Z: " << min_Z);
+    ROS_DEBUG_STREAM("min_Z: " << min_Z);
 
     tf::StampedTransform transform;
     try
@@ -77,24 +77,16 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     // - Translation: [0.267921, 2.43532, 2.16394]
     // - Rotation: in+ Quaternion [-0.286553, 0.576745, -0.163858, 0.747263]
 
-    ROS_INFO_STREAM("Time Stamp: " << octomap_msg->header.stamp);
+    ROS_DEBUG_STREAM("Time Stamp: " << octomap_msg->header.stamp);
 
-    // std::cout << transform << std::endl;
     tf::Vector3 v = transform.getOrigin();
     tf::Quaternion q = transform.getRotation();
-    std::cout << "- Translation: [" << v.getX() << ", " << v.getY() << ", " << v.getZ() << "]" << std::endl;
-    std::cout << "- Rotation: in Quaternion [" << q.getX() << ", " << q.getY() << ", "
-              << q.getZ() << ", " << q.getW() << "]" << std::endl;
 
     // Roll: Around X-Axis
     // Pitch: Around Y-Axis
     // Yaw: Around Z-Axis
     double roll, pitch, yaw;
     transform.getBasis().getRPY(roll, pitch, yaw);
-    std::cout << "- Rotation: in Quaternion [" << q.getX() << ", " << q.getY() << ", "
-              << q.getZ() << ", " << q.getW() << "]" << std::endl
-              << "            in RPY (radian) [" << roll << ", " << pitch << ", " << yaw << "]" << std::endl
-              << "            in RPY (degree) [" << roll * 180.0 / M_PI << ", " << pitch * 180.0 / M_PI << ", " << yaw * 180.0 / M_PI << "]" << std::endl;
 
     // TODO: Get from config
     double flattening_width = 1.0;
@@ -116,7 +108,7 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     octomap::point3d start_box(x_min, y_min, v.getZ() - box_height); // -v.getZ() // Get threshold from somewhere else
     octomap::point3d end_box(x_max, y_max, v.getZ());
 
-    ROS_INFO_STREAM("Bounding box: (" << x_min << ", " << y_min << ") --> (" << x_max << ", " << y_max << ")");
+    ROS_DEBUG_STREAM("Bounding box: (" << x_min << ", " << y_min << ") --> (" << x_max << ", " << y_max << ")");
 
     publish_bounding_box(start_box, end_box, octomap_msg->header.stamp);
 
@@ -133,7 +125,7 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     uint32_t image_width = end_x - start_x;
     uint32_t image_height = end_y - start_y;
  
-    ROS_INFO_STREAM("Image Width: " << image_width << " Image Height: " << image_height << " Res: " << resolution);
+    ROS_DEBUG_STREAM("Image Width: " << image_width << " Image Height: " << image_height << " Res: " << resolution);
 
     // /* Taken from sensor_msgs/Images documentation: uint8[] data # actual matrix data, size is (step * rows) */
     std::vector<uint8_t> data(image_width * image_height, 0);
@@ -161,12 +153,12 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
             int image_idx = img_y * image_width + img_x;
 
             if (img_x < 0 || img_x >= image_width || img_y < 0 || img_y >= image_height){
-                ROS_INFO_STREAM("Not chosen: " << img_x << " " << img_y);
+                ROS_DEBUG_STREAM("Not chosen: " << img_x << " " << img_y);
                 continue;
             }
 
             /* "+z" to actually print it (uint8_t is typedef char* --> no + results in as interpreting as a char*) */
-            // ROS_INFO_STREAM("x, y: " << x << "x" << y << " z: " << +z); 
+            // ROS_DEBUG_STREAM("x, y: " << x << "x" << y << " z: " << +z); 
             data[image_idx] = std::max(data[image_idx], z);
         }
         else
@@ -193,7 +185,7 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
         /* Delete current node */
         m_octomap->deleteNode(key);
     }
-    ROS_INFO_STREAM("Out of " << full_cnt << ", " << cnt << " chosen");
+    ROS_DEBUG_STREAM("Out of " << full_cnt << ", " << cnt << " chosen");
 
     /*
     Header header        # Header timestamp should be acquisition time of image
@@ -228,7 +220,7 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     service_input.is_bigendian = 0;
     service_input.step = image_width;
     service_input.data.assign(data.begin(), data.end());
-    ROS_INFO_STREAM("data size: " << service_input.data.size() << " should be: " << image_width * image_height);
+    ROS_DEBUG_STREAM("data size: " << service_input.data.size() << " should be: " << image_width * image_height);
     height_image_pub_.publish(service_input);
 
 
@@ -241,7 +233,7 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     {
         service_output = srv.response.output;
         height_result_pub_.publish(service_output);
-        ROS_INFO_STREAM("Service returned image of size " << service_output.height << " x " << service_output.width);
+        ROS_DEBUG_STREAM("Service returned image of size " << service_output.height << " x " << service_output.width);
     }
     else
     {
@@ -257,8 +249,8 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
         min_img_z = std::min(it, min_img_z);
     }
 
-    ROS_INFO_STREAM("Minimal Value in image above " << min_image_height << " is: " << +min_img_z);
-    
+    ROS_DEBUG_STREAM("Minimal Value in image above " << min_image_height << " is: " << +min_img_z);
+
     for (uint32_t image_y = 0; image_y < service_output.height; ++image_y)
     {
         for (uint32_t image_x = 0; image_x < service_output.width; ++image_x)
@@ -329,7 +321,7 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     // out_msg.header.stamp = ros::Time::now(); // This creates the new octomap at the new timestamp
 
     /* Publish & Clean up */
-    ROS_INFO_STREAM("Publishing tree with " << m_octomap->calcNumNodes() << " nodes");
+    ROS_DEBUG_STREAM("Publishing tree with " << m_octomap->calcNumNodes() << " nodes");
     octomap_pub_.publish(out_msg);
     delete m_octomap;
 }
