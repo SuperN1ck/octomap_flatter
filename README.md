@@ -46,5 +46,9 @@ $ source ../devel/setup.bash
 Once your camera is running you can use our launch-file
 ```
 $ roslaunch octomap_flatter octomap_flatter.launch 
+```
+If using with bagfile
+```
+$ roslaunch octomap_flatter octomap_flatter.launch bagfile:=PATH_TO_BAGFILE 
 $ rviz -d rviz_config.rviz
 ```
