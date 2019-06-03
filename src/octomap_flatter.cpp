@@ -263,10 +263,8 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     {
         for (uint32_t image_x = 0; image_x < service_output.width; ++image_x)
         {
-            float x_coord = (image_x * resolution) + start_box.x() - resolution / 2;
-            float y_coord = (image_y * resolution) + start_box.y() - resolution / 2;
-            // float x_coord = (image_x + start_x + 0.5) * resolution;
-            // float y_coord = (image_y + start_y + 0.5) * resolution;
+            float x_coord = ((int)image_x + start_x + 0.5) * resolution;
+            float y_coord = ((int)image_y + start_y + 0.5) * resolution;
             int image_idx = image_y * service_output.step + image_x;
             uint8_t image_z = service_output.data[image_idx];
 

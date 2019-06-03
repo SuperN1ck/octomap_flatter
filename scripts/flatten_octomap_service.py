@@ -17,24 +17,40 @@ import scipy.ndimage
 
 from sklearn.cluster import AgglomerativeClustering, KMeans, MeanShift, estimate_bandwidth
 from sklearn.neighbors import kneighbors_graph
+from scipy.spatial import ConvexHull, Delaunay
 
 import os 
 
 def plot_plane(a, b, c, d, h, w):
-	xx, yy = np.mgrid[:h, :w]
-	return xx, yy, (-d - a * xx - b * yy) / c
+    xx, yy = np.mgrid[:h, :w]
+    return xx, yy, (-d - a * xx - b * yy) / c
 
 def augment(points):
-	aug_pts = np.ones((len(points), 4))
-	aug_pts[:, :3] = points
-	return aug_pts
+    aug_pts = np.ones((len(points), 4))
+    aug_pts[:, :3] = points
+    return aug_pts
 
 def estimate(points):
-	aug_pts = augment(points[:3])
-	return np.linalg.svd(aug_pts)[-1][-1, :]
+    aug_pts = augment(points[:3])
+    return np.linalg.svd(aug_pts)[-1][-1, :]
 
 def is_inlier(coeffs, point, threshold):
-	return np.abs(coeffs.dot(augment([point]).T)) < threshold
+    return np.abs(coeffs.dot(augment([point]).T)) < threshold
+
+def in_hull(p, hull):
+    """
+    Test if points in `p` are in `hull`
+
+    `p` should be a `NxK` coordinates of `N` points in `K` dimensions
+    `hull` is either a scipy.spatial.Delaunay object or the `MxK` array of the 
+    coordinates of `M` points in `K`dimensions for which Delaunay triangulation
+    will be computed
+    """
+    from scipy.spatial import Delaunay
+    if not isinstance(hull,Delaunay):
+        hull = Delaunay(hull)
+
+    return hull.find_simplex(p)>=0
 
 def flatten(img):
     points = []
@@ -58,18 +74,29 @@ def flatten(img):
     xx, yy, zz = plot_plane(a, b, c, d, h, w)
     gnd_height = int(round(np.average(zz)))
 
-    if len(gnd_list):
-        gnd = np.asarray(gnd_list)
-        for g in gnd:
-            img[g[0],g[1]] = gnd_height
     if len(obj_list):
         obj = np.asarray(obj_list)
         obj_2d = obj[:,:2]
 
         if len(obj_list) > N * 0.1:
+            topview = np.zeros((h,w,2))
+            obj_img = np.zeros((h,w))
+            filt_obj_list = []
+            for o in obj_list:
+                obj_img[o[0],o[1]] = o[2]
+            obj_img = obj_img.astype(np.uint8)
+            obj_img = cv2.bilateralFilter(obj_img,5,75,75)
+            for o in obj_list:
+                if obj_img[o[0],o[1]] > gnd_height:
+                    filt_obj_list.append(o)
+                else:
+                    gnd_list.append([o[0],o[1],gnd_height])
+            filt_obj = np.asarray(filt_obj_list)
+            filt_obj_2d = filt_obj[:,:2]
+
             #cluster
-            connectivity = kneighbors_graph(obj_2d, n_neighbors=50, include_self=False)			
-            estimator = AgglomerativeClustering(linkage='ward', connectivity=connectivity)
+            # connectivity = kneighbors_graph(obj_2d, n_neighbors=50, include_self=False)			
+            estimator = AgglomerativeClustering(linkage='single')#, connectivity=connectivity)
             estimator.fit(obj_2d)
             labels = estimator.labels_
             cluster_list = [[] for c in range(estimator.n_clusters)]
@@ -77,22 +104,62 @@ def flatten(img):
                 cluster_list[labels[idx]].append(val)
 
             for idx, cluster in enumerate(cluster_list):
-                N = len(cluster)
+                N_total = len(cluster)
+                N_now = N_total
                 cluster = np.asarray(cluster)
-                estimator = MeanShift(bin_seeding=True)
-                estimator.fit(cluster)
-                labels = estimator.labels_
-                lab_cnt = {}
-                for l in labels:
-                    if not l in lab_cnt:
-                        lab_cnt[l] = 0
-                    lab_cnt[l] += 1
-                for l in lab_cnt:
-                    if lab_cnt[l] / float(N) > 0.2:
-                        new_clus = cluster[labels == l]
-                        new_height = int(np.average(new_clus[:,2]))
-                        for p in new_clus:
-                            img[p[0],p[1]] = new_height
+                h_cnt = {}
+                for p in cluster:
+                    if not p[2] in h_cnt:
+                        h_cnt[p[2]] = 0
+                    h_cnt[p[2]] += 1
+
+                while h_cnt:
+                    height = max(h_cnt)
+                    height_count = h_cnt[height]
+                    del h_cnt[height]
+                    if height_count/float(N_total) < 0.1 or height_count < 10:
+                        continue
+                    plane = cluster[cluster[:,2] == height]
+                    cluster = cluster[cluster[:,2] != height]
+
+                    plane_2d = plane[:,:2]
+                    N_now = len(cluster)
+
+                    try:
+                        hull = ConvexHull(plane_2d)
+                    except Exception as e:
+                        continue
+                    edge_2d = np.array(plane_2d[hull.vertices])
+                    c_x = sum([p[0] for p in plane_2d]) / len(plane_2d)
+                    c_y = sum([p[1] for p in plane_2d]) / len(plane_2d)
+
+                    tri = Delaunay(edge_2d)
+
+                    fill = []
+                    for i in range(min(edge_2d[:,0]),max(edge_2d[:,0])+1):
+                        for j in range(min(edge_2d[:,1]),max(edge_2d[:,1])+1):
+                            fill.append([i,j])
+                    fill = np.array(fill)
+                    mask = in_hull(fill, tri)
+                    fill = fill[mask]
+                    if topview[c_x,c_y,0] == 0 or abs(topview[c_x,c_y,1]-height) > 2:
+                        for f in fill:
+                            if topview[f[0],f[1],0] == 0:
+                                img[f[0],f[1]] = height
+                            topview[f[0],f[1],0] = height
+                            topview[f[0],f[1],1] = height
+                    else:
+                        new_height = topview[c_x,c_y,0]
+                        for f in fill:
+                            if topview[f[0],f[1],0] == 0:
+                                img[f[0],f[1]] = new_height
+                            topview[f[0],f[1],0] = new_height
+                            topview[f[0],f[1],1] = height
+    
+    if len(gnd_list):
+        gnd = np.asarray(gnd_list)
+        for g in gnd:
+            img[g[0],g[1]] = gnd_height
     return img
 
 def call_flatten(req):
