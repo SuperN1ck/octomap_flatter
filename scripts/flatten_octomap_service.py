@@ -4,22 +4,12 @@ from ransac_lib import *
 from octomap_flatter.srv import *
 import rospy
 
-import matplotlib;
-import matplotlib.pyplot as plt
-
 import numpy as np
-import numpy.ma as ma
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
-import imutils
-import scipy
-import scipy.ndimage
 
-from sklearn.cluster import AgglomerativeClustering, KMeans, MeanShift, estimate_bandwidth
-from sklearn.neighbors import kneighbors_graph
+from sklearn.cluster import AgglomerativeClustering 
 from scipy.spatial import ConvexHull, Delaunay
-
-import os 
 
 def plot_plane(a, b, c, d, h, w):
     xx, yy = np.mgrid[:h, :w]
@@ -38,15 +28,6 @@ def is_inlier(coeffs, point, threshold):
     return np.abs(coeffs.dot(augment([point]).T)) < threshold
 
 def in_hull(p, hull):
-    """
-    Test if points in `p` are in `hull`
-
-    `p` should be a `NxK` coordinates of `N` points in `K` dimensions
-    `hull` is either a scipy.spatial.Delaunay object or the `MxK` array of the 
-    coordinates of `M` points in `K`dimensions for which Delaunay triangulation
-    will be computed
-    """
-    from scipy.spatial import Delaunay
     if not isinstance(hull,Delaunay):
         hull = Delaunay(hull)
 
@@ -94,9 +75,8 @@ def flatten(img):
             filt_obj = np.asarray(filt_obj_list)
             filt_obj_2d = filt_obj[:,:2]
 
-            #cluster
-            # connectivity = kneighbors_graph(obj_2d, n_neighbors=50, include_self=False)			
-            estimator = AgglomerativeClustering(linkage='single')#, connectivity=connectivity)
+            # CLUSTER		
+            estimator = AgglomerativeClustering(linkage='single')
             estimator.fit(obj_2d)
             labels = estimator.labels_
             cluster_list = [[] for c in range(estimator.n_clusters)]
@@ -177,6 +157,4 @@ rospy.init_node('flatten_octomap_server')
 s = rospy.Service('flatten_octomap', OctoImage, call_flatten)
 rospy.loginfo("Starting flatten_octomap_server")
 
-import sys
-print(sys.executable)
 rospy.spin()
