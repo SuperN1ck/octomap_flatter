@@ -13,7 +13,8 @@
 
 namespace octflat
 {
-OctomapFlatter::OctomapFlatter(ros::NodeHandle &nh, ros::NodeHandle &nh_private) : nh_(nh),
+OctomapFlatter::OctomapFlatter(ros::NodeHandle &nh, ros::NodeHandle &nh_private) : 
+    nh_(nh),
                                                                                    nh_private_(nh_private),
                                                                                    octomap_sub_(nh, "/octomap_full", 1),
                                                                                    projected_map_sub_(nh, "/projected_map", 1),
@@ -52,13 +53,9 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
 
     for (octomap::OcTree::leaf_iterator it = m_octomap->begin_leafs(), end = m_octomap->end_leafs(); it != end; ++it)
     {
-        if (it.getZ() >= min_Z)
-            continue;
-
+        if (it.getZ() < min_Z)
         min_Z = it.getZ();
     }
-
-    ROS_DEBUG_STREAM("min_Z: " << min_Z);
 
     tf::StampedTransform transform;
     try
@@ -73,10 +70,6 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
         return;
     }
 
-    /* Construct Height Image */
-    // - Translation: [0.267921, 2.43532, 2.16394]
-    // - Rotation: in+ Quaternion [-0.286553, 0.576745, -0.163858, 0.747263]
-
     ROS_DEBUG_STREAM("Time Stamp: " << octomap_msg->header.stamp);
 
     tf::Vector3 v = transform.getOrigin();
@@ -88,11 +81,11 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     double roll, pitch, yaw;
     transform.getBasis().getRPY(roll, pitch, yaw);
 
-    // TODO: Get from config
-    double flattening_width = 1.0;
-    double flattening_height = 1.0;
-    double box_height = 1.5; // Shouldn't be bigger than 2.45 m
-    double min_image_height = 10; // Want from 10 upwards
+    float flattening_width, flattening_height, box_height, min_image_height;
+    nh_private_.getParam("flattening_width", flattening_width);
+    nh_private_.getParam("flattening_height", flattening_height);
+    nh_private_.getParam("box_height", box_height);
+    nh_private_.getParam("min_image_height", min_image_height);
 
     tf::Vector3 z_axis(0., 0., 1.);
     tf::Vector3 pt1 = v + tf::Vector3(0.0, flattening_width/2, 0.0).rotate(z_axis, yaw);
@@ -115,8 +108,6 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     /* Create data array */
     // TODO Check for correct frame direction
     double resolution = m_octomap->getResolution();
-    // uint32_t image_width = ((end_box.x() - start_box.x()) / resolution) + 1; // We need to add 1 in case the center is out of the bounding box
-    // uint32_t image_height = ((end_box.y() - start_box.y()) / resolution) + 1;
     int start_x = floor(start_box.x() / resolution);
     int start_y = floor(start_box.y() / resolution);
     int end_x = ceil(end_box.x() / resolution);
@@ -220,7 +211,6 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     service_input.is_bigendian = 0;
     service_input.step = image_width;
     service_input.data.assign(data.begin(), data.end());
-    ROS_DEBUG_STREAM("data size: " << service_input.data.size() << " should be: " << image_width * image_height);
     height_image_pub_.publish(service_input);
 
 

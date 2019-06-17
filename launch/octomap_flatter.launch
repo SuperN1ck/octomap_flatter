@@ -2,7 +2,9 @@
 
     <include file="$(find octomap_flatter)/launch/octomap.launch" />
 
-    <node pkg="octomap_flatter" type="octomap_flatter_node" name="octomap_flatter" output="screen" />
+    <node pkg="octomap_flatter" type="octomap_flatter_node" name="octomap_flatter" output="screen">
+        <rosparam command="load" file="$(find octomap_flatter)/config/flatter.yaml" />
+    </node>
 
     <node pkg="octomap_flatter" type="flatten_octomap_service.py" name="flatten_octomap_service" output="screen" />
 
@@ -32,9 +34,9 @@
     <!-- 90 Degree -->
     <!-- <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args=" 0 0 0.5 0 0.707 0 0.707 base_link camera_link 100" /> -->
     <!-- 88.5 Degree "test_v3.bag" -->
-    <!-- <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args=" 0 0 0.5 0 0.698 0 0.716 base_link camera_link 100" /> -->
+    <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args=" 0 0 0.5 0 0.698 0 0.716 base_link camera_link 100" />
     <!-- 53.6 Degree "test_v4.bag" -->
-    <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args=" 0 0 0.65 0 0.451 0 0.893 base_link camera_link 100" />
+    <!-- <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args=" 0 0 0.65 0 0.451 0 0.893 base_link camera_link 100" /> -->
     <!-- 40 Degree "test_v5.bag" -->
     <!-- <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args=" 0 0 0.5 0 0.423 0 0.906 base_link camera_link 100" /> -->
     
