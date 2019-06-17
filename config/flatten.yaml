@@ -1,4 +1,0 @@
-flattening_width : 1.0
-flattening_height : 1.0
-box_height : 1.5 # Shouldn't be bigger than 2.45 m
-min_image_height : 10.0 # Want from 10 upwards

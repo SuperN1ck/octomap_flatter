@@ -81,11 +81,15 @@ void OctomapModify::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octom
     double roll, pitch, yaw;
     transform.getBasis().getRPY(roll, pitch, yaw);
 
-    float flattening_width, flattening_height, box_height, min_image_height;
-    nh_private_.getParam("flattening_width", flattening_width);
-    nh_private_.getParam("flattening_height", flattening_height);
-    nh_private_.getParam("box_height", box_height);
-    nh_private_.getParam("min_image_height", min_image_height);
+    float flattening_width = config_.flattening_width;
+    float flattening_height = config_.flattening_height;
+    float box_height = config_.box_height;
+    float min_image_height = config_.min_image_height;
+    // nh_private_.getParam("flattening_width", flattening_width);
+    // nh_private_.getParam("flattening_height", flattening_height);
+    // nh_private_.getParam("box_height", box_height);
+    // nh_private_.getParam("min_image_height", min_image_height);
+    ROS_INFO_STREAM("XXXXXXXXXXXXXXXXX " << flattening_width << ", " << flattening_height << ", " << box_height << ", " << min_image_height);
 
     tf::Vector3 z_axis(0., 0., 1.);
     tf::Vector3 pt1 = v + tf::Vector3(0.0, flattening_width/2, 0.0).rotate(z_axis, yaw);

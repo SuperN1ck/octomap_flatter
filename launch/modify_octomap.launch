@@ -2,9 +2,7 @@
 
     <include file="$(find floor_octomap)/launch/octomap.launch" />
 
-    <node pkg="floor_octomap" type="modify_octomap_node" name="modify_octomap" output="screen">
-        <rosparam command="load" file="$(find floor_octomap)/config/flatten.yaml" />
-    </node>
+    <node pkg="floor_octomap" type="modify_octomap_node" name="modify_octomap" output="screen" />
 
     <node pkg="floor_octomap" type="flatten_octomap_service.py" name="flatten_octomap_service" output="screen" />
 
