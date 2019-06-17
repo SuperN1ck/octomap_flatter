@@ -1,5 +1,5 @@
 # Floor Octomap
-This package flattens an Octomap.
+This package flattens the Octomap of the floor.
 
 Briefly following is happening. At all times a visual SLAM algorithm is running - in our case [Dense Visual Odometry and SLAM (dvo_slam)](https://github.com/tum-vision/dvo_slam). The SLAM algorithm publishes a pointcloud based on his current state. This pointcloud is used by an [Octomapping Server](https://github.com/OctoMap/octomap_mapping) to reconstruct an octomap based on the realworld. As this octomap is noisy this package tries to remove the noise based on the reconstructed octomap and re-publishes it.
 
@@ -28,7 +28,7 @@ $ git checkout kinetic-devel # If already on kinetic branch not necessary
 $ catkin_make -j8 --directory ../ -DCMAKE_BUILD_TYPE=Release --pkg dvo_slam
 ```
 If `g2o` is not installed please look ath the readme in https://github.com/SuperN1ck/dvo_slam/tree/kinetic-devel
-### Installing Octomap Flatter
+### Installing Floor Octomap
 Similarly `floor_octomap` can be installed
 ```
 $ git clone git@github.com:jyp0802/floor_octomap.git
