@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 import rospy
-from octomap_flatter.msg import BoundingBox, BoundingBoxArray
+from floor_octomap.msg import BoundingBox, BoundingBoxArray
 
 from boundary_detection import BoundaryDetection
 

@@ -114,7 +114,7 @@ Visualization Manager:
       Max. Octree Depth: 16
       Min. Height Display: -3.40282347e+38
       Name: OccupancyGrid - Flattened
-      Octomap Topic: /octomap_flattened
+      Octomap Topic: /modified_octomap
       Queue Size: 5
       Value: false
       Voxel Alpha: 1
@@ -179,10 +179,10 @@ Visualization Manager:
       Value: false
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /octomap_flatter_bounding_box
+      Marker Topic: /modifying_bounding_box
       Name: Marker
       Namespaces:
-        octomap_flatter vizualization: true
+        floor_octomap vizualization: true
       Queue Size: 100
       Value: true
     - Class: rviz/Image

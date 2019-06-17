@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from ransac_lib import *
-from octomap_flatter.srv import *
+from floor_octomap.srv import *
 import rospy
 
 import numpy as np

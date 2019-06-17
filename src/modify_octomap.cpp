@@ -1,5 +1,5 @@
-#include <octomap_flatter.h>
-#include <octomap_flatter/OctoImage.h>
+#include <modify_octomap.h>
+#include <floor_octomap/OctoImage.h>
 
 #include <octomap_msgs/conversions.h>
 #include <octomap/ColorOcTree.h>
@@ -11,9 +11,9 @@
 #include <visualization_msgs/Marker.h>
 
 
-namespace octflat
+namespace octomodify
 {
-OctomapFlatter::OctomapFlatter(ros::NodeHandle &nh, ros::NodeHandle &nh_private) : 
+OctomapModify::OctomapModify(ros::NodeHandle &nh, ros::NodeHandle &nh_private) : 
     nh_(nh),
                                                                                    nh_private_(nh_private),
                                                                                    octomap_sub_(nh, "/octomap_full", 1),
@@ -23,24 +23,24 @@ OctomapFlatter::OctomapFlatter(ros::NodeHandle &nh, ros::NodeHandle &nh_private)
 {
     /* Start Tracking */
     /* In */
-    connection_ = synchronizer_.registerCallback(boost::bind(&OctomapFlatter::octomapCallback, this, _1, _2));
+    connection_ = synchronizer_.registerCallback(boost::bind(&OctomapModify::octomapCallback, this, _1, _2));
     /* Out */
-    octomap_pub_ = nh.advertise<octomap_msgs::Octomap>("/octomap_flattened", 10);
-    bounding_box_pub_ = nh.advertise<visualization_msgs::Marker>("/octomap_flatter_bounding_box", 10);
+    octomap_pub_ = nh.advertise<octomap_msgs::Octomap>("/modified_octomap", 10);
+    bounding_box_pub_ = nh.advertise<visualization_msgs::Marker>("/modifying_bounding_box", 10);
     height_image_pub_ = nh.advertise<sensor_msgs::Image>("/height_image", 10);
     height_result_pub_ = nh.advertise<sensor_msgs::Image>("/height_result", 10);
     /* Parameters */
-    dynamic_reconfigure::Server<octomap_flatter::OctoFlatterConfig>::CallbackType f;
-    f = boost::bind(&OctomapFlatter::dynamicParameterCallback, this, _1, _2);
+    dynamic_reconfigure::Server<floor_octomap::FlattenConfig>::CallbackType f;
+    f = boost::bind(&OctomapModify::dynamicParameterCallback, this, _1, _2);
     param_server_.setCallback(f);
 
-    cluster_service_ = nh.serviceClient<octomap_flatter::OctoImage>("flatten_octomap");
+    cluster_service_ = nh.serviceClient<floor_octomap::OctoImage>("flatten_octomap");
 
 
-    ROS_INFO("Started octomap_flatter ...");
+    ROS_INFO("Started modify_octomap ...");
 }
 
-void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octomap_msg,
+void OctomapModify::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octomap_msg,
                                      const nav_msgs::OccupancyGrid::ConstPtr &occupancy_grid_msg)
 {
     ROS_DEBUG_STREAM("Flattening Octomap");
@@ -215,7 +215,7 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
 
 
     // Send height_image to the service and get the new_image
-    octomap_flatter::OctoImage srv;
+    floor_octomap::OctoImage srv;
 
     srv.request.input = service_input;
     sensor_msgs::Image service_output;
@@ -316,12 +316,12 @@ void OctomapFlatter::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octo
     delete m_octomap;
 }
 
-void OctomapFlatter::dynamicParameterCallback(octomap_flatter::OctoFlatterConfig &config, uint32_t level)
+void OctomapModify::dynamicParameterCallback(floor_octomap::FlattenConfig &config, uint32_t level)
 {
     config_ = config;
 }
 
-void OctomapFlatter::publish_bounding_box(octomap::point3d start_box, octomap::point3d end_box, ros::Time time_stamp)
+void OctomapModify::publish_bounding_box(octomap::point3d start_box, octomap::point3d end_box, ros::Time time_stamp)
 {
     visualization_msgs::Marker marker;
     // Set the frame ID and timestamp.  See the TF tutorials for information on these.
@@ -330,7 +330,7 @@ void OctomapFlatter::publish_bounding_box(octomap::point3d start_box, octomap::p
 
     // Set the namespace and id for this marker.  This serves to create a unique ID
     // Any marker sent with the same namespace and id will overwrite the old one
-    marker.ns = "octomap_flatter vizualization";
+    marker.ns = "floor_octomap vizualization";
     marker.id = 0;
 
     // Set the marker type.  Initially this is CUBE, and cycles between that and SPHERE, ARROW, and CYLINDER
@@ -362,4 +362,4 @@ void OctomapFlatter::publish_bounding_box(octomap::point3d start_box, octomap::p
     bounding_box_pub_.publish(marker);
 }
 
-} // namespace octflat
+}

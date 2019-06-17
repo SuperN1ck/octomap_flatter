@@ -2,7 +2,7 @@ from distutils.core import setup
 from catkin_pkg.python_setup import generate_distutils_setup
 
 d = generate_distutils_setup(
-    packages=["octomap_flatter","imutils","scipy"],
+    packages=["floor_octomap","imutils","scipy"],
     scripts=["scripts/boundary_detector","scripts"],
     package_dir={"": "src"}
 )

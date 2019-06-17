@@ -1,5 +1,5 @@
-#ifndef OCTOMAP_FLATTER_H_
-#define OCTOMAP_FLATTER_H_
+#ifndef OCTOMAP_MODIFY_H_
+#define OCTOMAP_MODIFY_H_
 
 #include <ros/ros.h>
 #include <ros/console.h>
@@ -12,12 +12,12 @@
 #include <message_filters/sync_policies/approximate_time.h>
 
 #include <dynamic_reconfigure/server.h>
-#include <octomap_flatter/OctoFlatterConfig.h>
+#include <floor_octomap/FlattenConfig.h>
 
 #include <tf/transform_listener.h>
 
 
-namespace octflat
+namespace octomodify
 {
 
 uint8_t octomap_to_image_height(double oct, double min_image_height, double start_box)
@@ -36,7 +36,7 @@ typedef message_filters::sync_policies::ApproximateTime<octomap_msgs::Octomap,
                                                         nav_msgs::OccupancyGrid>
     SyncPolicy;
 
-class OctomapFlatter
+class OctomapModify
 {
 
 private:
@@ -59,15 +59,15 @@ private:
     void publish_bounding_box(octomap::point3d start_box, octomap::point3d end_box, ros::Time time_stamp);
     void get_bounding_box(tf::StampedTransform& transform, octomap::point3d& start_box, octomap::point3d& end_box);
     /* Parameters */
-    octomap_flatter::OctoFlatterConfig config_;
-    dynamic_reconfigure::Server<octomap_flatter::OctoFlatterConfig> param_server_;
-    void dynamicParameterCallback(octomap_flatter::OctoFlatterConfig &config, uint32_t level);
+    floor_octomap::FlattenConfig config_;
+    dynamic_reconfigure::Server<floor_octomap::FlattenConfig> param_server_;
+    void dynamicParameterCallback(floor_octomap::FlattenConfig &config, uint32_t level);
 
     ros::ServiceClient cluster_service_;
 
 public:
-    OctomapFlatter(ros::NodeHandle &nh, ros::NodeHandle &nh_private);
+    OctomapModify(ros::NodeHandle &nh, ros::NodeHandle &nh_private);
 };
-} // namespace octflat
+}
 
 #endif

@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 import rospy
-from octomap_flatter.msg import BoundingBox
+from floor_octomap.msg import BoundingBox
 
 import rospy
 

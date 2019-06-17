@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(octomap_flatter)
+project(floor_octomap)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 add_compile_options(-std=c++11)
@@ -98,7 +98,7 @@ generate_messages(
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
 generate_dynamic_reconfigure_options(
-   cfg/octoflatter.cfg
+   cfg/flatten.cfg
 )
 
 ###################################
@@ -112,7 +112,7 @@ generate_dynamic_reconfigure_options(
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES octomap_flatter
+  LIBRARIES floor_octomap
 #  CATKIN_DEPENDS other_catkin_pkg
 #  DEPENDS system_lib
 )
@@ -133,7 +133,7 @@ include_directories(
 
 ## Declare a C++ library
 add_library(${PROJECT_NAME}
-   src/octomap_flatter.cpp
+   src/modify_octomap.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -148,7 +148,7 @@ add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EX
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(${PROJECT_NAME}_node src/octomap_flatter_node.cpp)
+add_executable(modify_octomap_node src/modify_octomap_node.cpp)
 add_executable(cloud_voxel_filter_node src/cloud_voxel_filter_node.cpp)
 
 ## Rename C++ executable without prefix
@@ -162,7 +162,7 @@ add_executable(cloud_voxel_filter_node src/cloud_voxel_filter_node.cpp)
 # add_dependencies(${PROJECT_NAME}_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(${PROJECT_NAME}_node ${PROJECT_NAME})
+target_link_libraries(modify_octomap_node ${PROJECT_NAME})
 target_link_libraries(cloud_voxel_filter_node ${PCL_LIBRARIES} ${catkin_LIBRARIES})
 
 catkin_generate_virtualenv()
@@ -212,7 +212,7 @@ catkin_install_python(
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_octomap_flatter.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_floor_octomap.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()

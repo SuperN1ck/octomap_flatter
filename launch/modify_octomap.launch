@@ -1,12 +1,12 @@
 <launch>
 
-    <include file="$(find octomap_flatter)/launch/octomap.launch" />
+    <include file="$(find floor_octomap)/launch/octomap.launch" />
 
-    <node pkg="octomap_flatter" type="octomap_flatter_node" name="octomap_flatter" output="screen">
-        <rosparam command="load" file="$(find octomap_flatter)/config/flatter.yaml" />
+    <node pkg="floor_octomap" type="modify_octomap_node" name="modify_octomap" output="screen">
+        <rosparam command="load" file="$(find floor_octomap)/config/flatten.yaml" />
     </node>
 
-    <node pkg="octomap_flatter" type="flatten_octomap_service.py" name="flatten_octomap_service" output="screen" />
+    <node pkg="floor_octomap" type="flatten_octomap_service.py" name="flatten_octomap_service" output="screen" />
 
     <!-- RUN FROM BAG FILE -->
     <arg name="bagfile" default="false"/>
@@ -15,7 +15,7 @@
         <param name="/use_sim_time" value="True"/>
     </group>
 
-    <!-- <node type="rviz" name="rviz" pkg="rviz" args="-d $(find octomap_flatter)/rviz_config.rviz" /> -->
+    <!-- <node type="rviz" name="rviz" pkg="rviz" args="-d $(find floor_octomap )/rviz_config.rviz" /> -->
 
 
     <!-- STATIC TRANSFORM PUBLISHER -->
@@ -50,15 +50,15 @@
 
 
     <!-- VOXEL FILTER POINTCLOUD -->
-    <node pkg="octomap_flatter" type="cloud_voxel_filter_node" name="cloud_voxel_filter" output="screen"
+    <node pkg="floor_octomap" type="cloud_voxel_filter_node" name="cloud_voxel_filter" output="screen"
             args="/dvo_cloud_in /voxel_filtered_cloud 5"/>
 
 
     <!-- FILTER DEPTH IMAGE ON DEPTH -->
-    <node pkg="octomap_flatter" type="tf_alias_node.py" name="tf_alias" output="screen" 
+    <node pkg="floor_octomap" type="tf_alias_node.py" name="tf_alias" output="screen" 
             args="/base_link_estimate /camera_depth_optical_frame_estimate /base_link /camera_depth_optical_frame"/>
 
-    <node pkg="octomap_flatter" type="depth_image_filter_node.py" name="filter_depth_service" output="screen" 
+    <node pkg="floor_octomap" type="depth_image_filter_node.py" name="filter_depth_service" output="screen" 
             args="/camera/depth/image_rect_raw /filtered_depth_image"/>
 
 

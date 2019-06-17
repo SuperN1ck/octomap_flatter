@@ -4,19 +4,19 @@
 
 #include <ros/ros.h>
 #include <ros/console.h>
-#include <octomap_flatter.h>
+#include <modify_octomap.h>
 
 // #include <.h>
 
 int main(int argc, char **argv) {
-    ros::init(argc, argv, "octomap_flatter");
+    ros::init(argc, argv, "modify_octomap");
 
     ros::NodeHandle nh;
     ros::NodeHandle nh_private("~");
 
-    octflat::OctomapFlatter octomap_flatter(nh, nh_private);
+    octomodify::OctomapModify modify_octomap(nh, nh_private);
 
-    ROS_INFO("Starting octomap_flatter node ...");
+    ROS_INFO("Starting modify_octomap node ...");
 
     // ros::Spinner spinner(1);
     // spinner.spin();
