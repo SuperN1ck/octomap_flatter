@@ -20,14 +20,14 @@
 namespace octomodify
 {
 
-uint8_t octomap_to_image_height(double oct, double min_image_height, double start_box)
+uint8_t octomap_to_image_height(double oct, double image_height_base, double start_box)
 {
-    return ((oct - start_box) * 100) + min_image_height;
+    return ((oct - start_box) * 100) + image_height_base;
 }
 
-double image_to_octomap_height(uint8_t img, double min_image_height, double start_box)
+double image_to_octomap_height(uint8_t img, double image_height_base, double start_box)
 {
-    return ((img - min_image_height) / 100)  + start_box;
+    return ((img - image_height_base) / 100)  + start_box;
 }
 
 

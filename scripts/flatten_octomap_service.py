@@ -57,12 +57,12 @@ def flatten(img):
 
     if len(obj_list):
         obj = np.asarray(obj_list)
+        filt_obj_list = []
         obj_2d = obj[:,:2]
 
         if len(obj_list) > N * 0.1:
             topview = np.zeros((h,w,2))
             obj_img = np.zeros((h,w))
-            filt_obj_list = []
             for o in obj_list:
                 obj_img[o[0],o[1]] = o[2]
             obj_img = obj_img.astype(np.uint8)
@@ -72,6 +72,8 @@ def flatten(img):
                     filt_obj_list.append(o)
                 else:
                     gnd_list.append([o[0],o[1],gnd_height])
+
+        if len(filt_obj_list):
             filt_obj = np.asarray(filt_obj_list)
             filt_obj_2d = filt_obj[:,:2]
 

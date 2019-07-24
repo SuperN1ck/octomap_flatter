@@ -1,19 +1,36 @@
 <launch>
 
-    <include file="$(find floor_octomap)/launch/octomap.launch" />
+    <node pkg="octomap_server" type="octomap_server_node" name="octomap_server">
+        <!-- resolution in meters per pixel -->
+        <param name="resolution" value="0.02" />
+        <!-- name of the fixed frame, needs to be "/map" for SLAM -->
+        <param name="frame_id" type="string" value="/world" />
+        <param name="sensor_model/max_range" value="10"/>
+        <!-- <param name="latch" value="true" /> -->
+        <!-- max/min height for occupancy map, should be in meters -->
+        <param name="pointcloud_max_x" value="100" />
+        <param name="pointcloud_min_x" value="-100" />
+        <param name="pointcloud_max_y" value="100" />
+        <param name="pointcloud_min_y" value="-100" />
+        <param name="pointcloud_max_z" value="100" />
+        <param name="pointcloud_min_z" value="-0.3" />
 
+        <param name="occupancy_min_z" value="0.05" />
+        <!-- This gives an error -->
+        <!-- <param name="filter_ground" value="true" /> --> 
+
+        <!-- topic from where pointcloud2 messages are subscribed -->
+        <!-- <remap from="/cloud_in" to="/camera/depth_registered/points" /> -->
+        <remap from="/cloud_in" to="/camera/depth/points" />
+        <!-- <remap from="/cloud_in" to="/depth_filtered_cloud" /> -->
+        
+    </node>
+<!-- 
     <node pkg="floor_octomap" type="modify_octomap_node" name="modify_octomap" output="screen">
         <rosparam command="load" file="$(find floor_octomap)/config/flatten.yaml" />
-    </node>
+    </node> -->
 
     <node pkg="floor_octomap" type="flatten_octomap_service.py" name="flatten_octomap_service" output="screen" />
-
-    <!-- RUN FROM BAG FILE -->
-    <arg name="bagfile" default="false"/>
-    <group if="$(eval bagfile != false)">
-        <node pkg="rosbag" type="play" name="rosbag_player" output="screen" args="--clock -d 1 $(arg bagfile)"/>
-        <param name="/use_sim_time" value="True"/>
-    </group>
 
     <!-- <node type="rviz" name="rviz" pkg="rviz" args="-d $(find floor_octomap )/rviz_config.rviz" /> -->
 
@@ -51,26 +68,8 @@
     </node>
 
 
-    <!-- VOXEL FILTER POINTCLOUD -->
-    <node pkg="floor_octomap" type="cloud_voxel_filter_node" name="cloud_voxel_filter" output="screen"
-            args="/dvo_cloud_in /voxel_filtered_cloud 5"/>
-
-
     <!-- FILTER DEPTH IMAGE ON DEPTH -->
-    <node pkg="floor_octomap" type="tf_alias_node.py" name="tf_alias" output="screen" 
-            args="/base_link_estimate /camera_depth_optical_frame_estimate /base_link /camera_depth_optical_frame"/>
+    <!-- <node pkg="floor_octomap" type="tf_alias_node.py" name="tf_alias" output="screen" 
+            args="/base_link_estimate /camera_depth_optical_frame_estimate /base_link /camera_depth_optical_frame"/> -->
 
-    <node pkg="floor_octomap" type="depth_image_filter_node.py" name="filter_depth_service" output="screen" 
-            args="/camera/depth/image_rect_raw /filtered_depth_image"/>
-
-
-    <!-- CONVERT DEPTH IMAGE TO POINTCLOUD -->
-    <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager"/>
-
-    <node pkg="nodelet" type="nodelet" name="cloudify"
-            args="load depth_image_proc/point_cloud_xyz standalone_nodelet">
-        <remap from="points" to="depth_filtered_cloud"/>
-        <remap from="image_rect" to="filtered_depth_image"/>
-        <remap from="camera_info" to="camera/depth/camera_info"/>
-    </node>
 </launch>
