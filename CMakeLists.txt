@@ -97,9 +97,9 @@ generate_messages(
 ##     and list every .cfg file to be processed
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
-generate_dynamic_reconfigure_options(
-   cfg/Flatten.cfg
-)
+# generate_dynamic_reconfigure_options(
+#    cfg/Flatten.cfg
+# )
 
 ###################################
 ## catkin specific configuration ##

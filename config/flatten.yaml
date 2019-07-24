@@ -1,0 +1,20 @@
+# Threshold what is considered ground
+height_threshold: 0.05
+
+# Birds eye view width of the bounding box to modify (unit=m)
+flattening_width: 1.0
+
+# Birds eye view height of the bounding box to modify (unit=m)
+flattening_front: 1.5
+
+# Birds eye view height of the bounding box to modify (unit=m)
+flattening_back: 0.7
+
+# How deep down the bounding box should reach from the camera point (unit=m)
+box_height: 1.0
+
+# Minimum value set on the depth image sent to the service
+image_height_base: 10.0
+
+# Filter: Max value for octomap depth image
+max_image_height: 0.5
