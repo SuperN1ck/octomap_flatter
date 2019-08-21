@@ -7,7 +7,7 @@ add_compile_options(-std=c++11)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS roscpp octomap_msgs message_filters dynamic_reconfigure rospy message_generation std_msgs geometry_msgs tf catkin_virtualenv)
+find_package(catkin REQUIRED COMPONENTS roscpp octomap_msgs message_filters rospy message_generation std_msgs geometry_msgs tf catkin_virtualenv)
 find_package(cmake_modules REQUIRED)
 
 # PCL

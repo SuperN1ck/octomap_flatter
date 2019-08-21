@@ -18,8 +18,7 @@ OctomapModify::OctomapModify(ros::NodeHandle &nh, ros::NodeHandle &nh_private) :
     nh_private_(nh_private),
     octomap_sub_(nh, "/octomap_full", 1),
     projected_map_sub_(nh, "/projected_map", 1),
-    synchronizer_(SyncPolicy(10), octomap_sub_, projected_map_sub_),
-    config_()
+    synchronizer_(SyncPolicy(10), octomap_sub_, projected_map_sub_)
 {
     /* Start Tracking */
     /* In */
@@ -29,10 +28,6 @@ OctomapModify::OctomapModify(ros::NodeHandle &nh, ros::NodeHandle &nh_private) :
     bounding_box_pub_ = nh.advertise<visualization_msgs::Marker>("/modifying_bounding_box", 10);
     height_image_pub_ = nh.advertise<sensor_msgs::Image>("/height_image", 10);
     height_result_pub_ = nh.advertise<sensor_msgs::Image>("/height_result", 10);
-    /* Parameters */
-    dynamic_reconfigure::Server<floor_octomap::FlattenConfig>::CallbackType f;
-    f = boost::bind(&OctomapModify::dynamicParameterCallback, this, _1, _2);
-    param_server_.setCallback(f);
 
     cluster_service_ = nh.serviceClient<floor_octomap::OctoImage>("flatten_octomap");
 
@@ -316,11 +311,6 @@ void OctomapModify::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octom
     ROS_DEBUG_STREAM("Publishing tree with " << m_octomap->calcNumNodes() << " nodes");
     octomap_pub_.publish(out_msg);
     delete m_octomap;
-}
-
-void OctomapModify::dynamicParameterCallback(floor_octomap::FlattenConfig &config, uint32_t level)
-{
-    config_ = config;
 }
 
 void OctomapModify::publish_bounding_box(octomap::point3d start_box, octomap::point3d end_box, ros::Time time_stamp)
