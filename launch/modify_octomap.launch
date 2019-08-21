@@ -1,6 +1,9 @@
 <launch>
 
-    <include file="$(find floor_octomap)/launch/octomap.launch" />
+    <include file="$(find floor_octomap)/launch/octomap.launch">
+        <arg name="resolution" value="0.02"/>
+        <arg name="cloud_mapping" value="/depth_filtered_cloud"/>
+    </include>
 
     <node pkg="floor_octomap" type="modify_octomap_node" name="modify_octomap" output="screen">
         <rosparam command="load" file="$(find floor_octomap)/config/flatten.yaml" />
@@ -15,7 +18,7 @@
         <param name="/use_sim_time" value="True"/>
     </group>
 
-    <!-- <node type="rviz" name="rviz" pkg="rviz" args="-d $(find floor_octomap )/rviz_config.rviz" /> -->
+    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find floor_octomap)/rviz_config.rviz" />
 
 
     <!-- STATIC TRANSFORM PUBLISHER -->
@@ -24,7 +27,7 @@
 
     <!-- world ~ base_link -->
     <!-- For bag -->
-    <node pkg="tf" type="static_transform_publisher" name="world_to_baselink_tf_pub" args="1 0 0.64 0 0 0 1 world base_link 100" />
+    <node pkg="tf" type="static_transform_publisher" name="world_to_baselink_tf_pub" args="1 0 0.6 0 0 0 1 world base_link 100" />
   
     <!-- base_link ~ camera_link -->
     <!-- 0 Degree -->
@@ -32,7 +35,7 @@
     <!-- 45 Degree -->
     <!-- <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args=" 0 0 0.5 0 0.383 0 0.924 base_link camera_link 100" /> -->
     <!-- 30 Degree "hubo_v1" -->
-    <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args=" 0 0 0.5 0 0.309 0 0.951 base_link camera_link 100" />
+    <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args=" 0 0 0.5 0 0.317 0 0.948 base_link camera_link 100" />
     <!-- 90 Degree -->
     <!-- <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args=" 0 0 0.5 0 0.707 0 0.707 base_link camera_link 100" /> -->
     <!-- 88.5 Degree "test_v3.bag" -->
