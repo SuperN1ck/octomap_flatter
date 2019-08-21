@@ -1,20 +1,23 @@
-# Threshold what is considered ground
-height_threshold: 0.05
+# Height distance from robot's feet to camera (unit=m)
+camera_robot_height: 0.6
 
 # Birds eye view width of the bounding box to modify (unit=m)
-flattening_width: 1.0
+box_width: 1.0
 
 # Birds eye view height of the bounding box to modify (unit=m)
-flattening_front: 1.5
+box_front: 0.8
 
 # Birds eye view height of the bounding box to modify (unit=m)
-flattening_back: 0.7
+box_back: 0.7
 
-# How deep down the bounding box should reach from the camera point (unit=m)
-box_height: 1.0
+# Height (up) of bounding box from Robot's feet (unit=m)
+box_up: 0.2
 
-# Minimum value set on the depth image sent to the service
+# Depth (down) of bounding box from Robot's feet (unit=m)
+box_down: 0.2
+
+# Starting/minimum value of pixels of the depth image sent to the service
 image_height_base: 10.0
 
-# Filter: Max value for octomap depth image
-max_image_height: 0.5
+# Scale that pixel values of the depth images are multiplied by
+pixel_height_scale: 2

@@ -76,31 +76,32 @@ void OctomapModify::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octom
     double roll, pitch, yaw;
     transform.getBasis().getRPY(roll, pitch, yaw);
 
-    float flattening_width, flattening_front, flattening_back, box_height, image_height_base, max_image_height;
-    nh_private_.getParam("flattening_width", flattening_width);
-    nh_private_.getParam("flattening_front", flattening_front);
-    nh_private_.getParam("flattening_back", flattening_back);
-    nh_private_.getParam("box_height", box_height);
+    float camera_robot_height, box_width, box_front, box_back, box_up, box_down, image_height_base;
+    int scale;
+    nh_private_.getParam("camera_robot_height", camera_robot_height);
+    nh_private_.getParam("box_width", box_width);
+    nh_private_.getParam("box_front", box_front);
+    nh_private_.getParam("box_back", box_back);
+    nh_private_.getParam("box_up", box_up);
+    nh_private_.getParam("box_down", box_down);
     nh_private_.getParam("image_height_base", image_height_base);
-    nh_private_.getParam("max_image_height", max_image_height);
-    if (max_image_height == 0)
-        max_image_height = v.getZ();
+    nh_private_.getParam("pixel_height_scale", scale);
 
     tf::Vector3 z_axis(0., 0., 1.);
-    tf::Vector3 pt1 = v + tf::Vector3(-flattening_back, flattening_width/2, 0.0).rotate(z_axis, yaw);
-    tf::Vector3 pt2 = v + tf::Vector3(-flattening_back, -flattening_width/2, 0.0).rotate(z_axis, yaw);
-    tf::Vector3 pt3 = v + tf::Vector3(flattening_front, flattening_width/2, 0.0).rotate(z_axis, yaw);
-    tf::Vector3 pt4 = v + tf::Vector3(flattening_front, -flattening_width/2, 0.0).rotate(z_axis, yaw);
+    tf::Vector3 pt1 = v + tf::Vector3(-box_back, box_width/2, 0.0).rotate(z_axis, yaw);
+    tf::Vector3 pt2 = v + tf::Vector3(-box_back, -box_width/2, 0.0).rotate(z_axis, yaw);
+    tf::Vector3 pt3 = v + tf::Vector3(box_front, box_width/2, 0.0).rotate(z_axis, yaw);
+    tf::Vector3 pt4 = v + tf::Vector3(box_front, -box_width/2, 0.0).rotate(z_axis, yaw);
     
     double x_min = std::min({pt1.getX(),pt2.getX(),pt3.getX(),pt4.getX()});
     double x_max = std::max({pt1.getX(),pt2.getX(),pt3.getX(),pt4.getX()});
     double y_min = std::min({pt1.getY(),pt2.getY(),pt3.getY(),pt4.getY()});
     double y_max = std::max({pt1.getY(),pt2.getY(),pt3.getY(),pt4.getY()});
 
-    octomap::point3d start_box(x_min, y_min, max_image_height - box_height);
-    octomap::point3d end_box(x_max, y_max, max_image_height);
+    octomap::point3d start_box(x_min, y_min, v.getZ() - camera_robot_height - box_down);
+    octomap::point3d end_box(x_max, y_max, v.getZ() - camera_robot_height + box_up);
 
-    ROS_DEBUG_STREAM("Bounding box: (" << x_min << ", " << y_min << ") --> (" << x_max << ", " << y_max << ")");
+    ROS_INFO_STREAM("Bounding box: (" << x_min << ", " << y_min << ", " << v.getZ() - camera_robot_height - box_down << ") --> (" << x_max << ", " << y_max << ", " << v.getZ() - camera_robot_height + box_up << ")");
 
     publish_bounding_box(start_box, end_box, octomap_msg->header.stamp);
 
@@ -130,7 +131,7 @@ void OctomapModify::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octom
 
         /*  Normalize Z Value in box and scale up to 255 
             We need to add the resolution as the centers might be above the camera */
-        uint8_t z = octomap_to_image_height(it.getZ(), image_height_base, start_box.z());
+        uint8_t z = octomap_to_image_height(it.getZ(), image_height_base, start_box.z(), scale);
 
         int oct_x = floor(it.getX() / resolution);
         int oct_y = floor(it.getY() / resolution);
@@ -273,7 +274,7 @@ void OctomapModify::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octom
                     break;
                 else
                 {
-                    float z_coord = image_to_octomap_height(image_z, image_height_base, start_box.z());
+                    float z_coord = image_to_octomap_height(image_z, image_height_base, start_box.z(), scale);
                     if (z_coord < min_Z)
                         continue;
                     octomap::point3d coord(x_coord, y_coord, z_coord);
@@ -283,9 +284,9 @@ void OctomapModify::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octom
             }
             if (is_edge)
             {
-                for (uint8_t fill_z = min_img_z; fill_z <= image_z; ++fill_z)
+                for (uint8_t fill_z = min_img_z; fill_z <= image_z; fill_z += (uint8_t) scale)
                 {
-                    float z_coord = image_to_octomap_height(fill_z, image_height_base, start_box.z());
+                    float z_coord = image_to_octomap_height(fill_z, image_height_base, start_box.z(), scale);
                     
                     if (z_coord < min_Z)
                         continue;

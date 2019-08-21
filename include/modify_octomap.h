@@ -11,23 +11,20 @@
 #include <message_filters/synchronizer.h>
 #include <message_filters/sync_policies/approximate_time.h>
 
-#include <dynamic_reconfigure/server.h>
-#include <floor_octomap/FlattenConfig.h>
-
 #include <tf/transform_listener.h>
 
 
 namespace octomodify
 {
 
-uint8_t octomap_to_image_height(double oct, double image_height_base, double start_box)
+uint8_t octomap_to_image_height(double oct, double image_height_base, double start_box, int scale)
 {
-    return ((oct - start_box) * 100) + image_height_base;
+    return ((oct - start_box) * (100 * scale)) + image_height_base;
 }
 
-double image_to_octomap_height(uint8_t img, double image_height_base, double start_box)
+double image_to_octomap_height(uint8_t img, double image_height_base, double start_box, int scale)
 {
-    return ((img - image_height_base) / 100)  + start_box;
+    return ((img - image_height_base) / (100 * scale))  + start_box;
 }
 
 
@@ -58,10 +55,6 @@ private:
     ros::Publisher height_result_pub_;
     void publish_bounding_box(octomap::point3d start_box, octomap::point3d end_box, ros::Time time_stamp);
     void get_bounding_box(tf::StampedTransform& transform, octomap::point3d& start_box, octomap::point3d& end_box);
-    /* Parameters */
-    floor_octomap::FlattenConfig config_;
-    dynamic_reconfigure::Server<floor_octomap::FlattenConfig> param_server_;
-    void dynamicParameterCallback(floor_octomap::FlattenConfig &config, uint32_t level);
 
     ros::ServiceClient cluster_service_;
 
