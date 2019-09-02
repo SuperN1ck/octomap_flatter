@@ -14,7 +14,7 @@ int main(int argc, char **argv) {
     ros::NodeHandle nh;
     ros::NodeHandle nh_private("~");
 
-    octomodify::OctomapModify modify_octomap(nh, nh_private);
+    octomodify::OctomapModify modify_octomap(nh, nh_private, argv[1]);
 
     ROS_INFO("Starting modify_octomap node ...");
 

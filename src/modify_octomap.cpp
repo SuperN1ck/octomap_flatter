@@ -13,12 +13,13 @@
 
 namespace octomodify
 {
-OctomapModify::OctomapModify(ros::NodeHandle &nh, ros::NodeHandle &nh_private) : 
+OctomapModify::OctomapModify(ros::NodeHandle &nh, ros::NodeHandle &nh_private, std::string tf_frame) : 
     nh_(nh),
     nh_private_(nh_private),
     octomap_sub_(nh, "/octomap_full", 1),
     projected_map_sub_(nh, "/projected_map", 1),
-    synchronizer_(SyncPolicy(10), octomap_sub_, projected_map_sub_)
+    synchronizer_(SyncPolicy(10), octomap_sub_, projected_map_sub_),
+    tf_frame_(tf_frame)
 {
     /* Start Tracking */
     /* In */
@@ -55,7 +56,7 @@ void OctomapModify::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octom
     tf::StampedTransform transform;
     try
     {
-        transform_listener_.lookupTransform("/world", "/base_link_estimate",
+        transform_listener_.lookupTransform("/world", tf_frame_,
                                             octomap_msg->header.stamp, transform);
     }
     catch (tf::TransformException ex)
@@ -101,7 +102,7 @@ void OctomapModify::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octom
     octomap::point3d start_box(x_min, y_min, v.getZ() - camera_robot_height - box_down);
     octomap::point3d end_box(x_max, y_max, v.getZ() - camera_robot_height + box_up);
 
-    ROS_INFO_STREAM("Bounding box: (" << x_min << ", " << y_min << ", " << v.getZ() - camera_robot_height - box_down << ") --> (" << x_max << ", " << y_max << ", " << v.getZ() - camera_robot_height + box_up << ")");
+    ROS_DEBUG_STREAM("Bounding box: (" << x_min << ", " << y_min << ", " << v.getZ() - camera_robot_height - box_down << ") --> (" << x_max << ", " << y_max << ", " << v.getZ() - camera_robot_height + box_up << ")");
 
     publish_bounding_box(start_box, end_box, octomap_msg->header.stamp);
 
@@ -176,127 +177,134 @@ void OctomapModify::octomapCallback(const octomap_msgs::Octomap::ConstPtr &octom
     }
     ROS_DEBUG_STREAM("Out of " << full_cnt << ", " << cnt << " chosen");
 
-    /*
-    Header header        # Header timestamp should be acquisition time of image
-                        # Header frame_id should be optical frame of camera
-                        # origin of frame should be optical center of camera
-                        # +x should point to the right in the image
-                        # +y should point down in the image
-                        # +z should point into to plane of the image
-                        # If the frame_id here and the frame_id of the CameraInfo
-                        # message associated with the image conflict
-                        # the behavior is undefined
-
-    uint32 height         # image height, that is, number of rows
-    uint32 width          # image width, that is, number of columns
-
-    # The legal values for encoding are in file src/image_encodings.cpp
-    # If you want to standardize a new string format, join
-    # ros-users@lists.sourceforge.net and send an email proposing a new encoding.
-
-    string encoding       # Encoding of pixels -- channel meaning, ordering, size
-                        # taken from the list of strings in include/sensor_msgs/image_encodings.h
-
-    uint8 is_bigendian    # is this data bigendian?
-    uint32 step           # Full row length in bytes
-    uint8[] data          # actual matrix data, size is (step * rows)
-    */
-    sensor_msgs::Image service_input;
-    service_input.header = octomap_msg->header;
-    service_input.height = image_height;
-    service_input.width = image_width;
-    service_input.encoding = sensor_msgs::image_encodings::MONO8;
-    service_input.is_bigendian = 0;
-    service_input.step = image_width;
-    service_input.data.assign(data.begin(), data.end());
-    height_image_pub_.publish(service_input);
-
-
-    // Send height_image to the service and get the new_image
-    floor_octomap::OctoImage srv;
-
-    srv.request.input = service_input;
-    sensor_msgs::Image service_output;
-    if (cluster_service_.call(srv))
+    if ((float) cnt / (image_width*image_height) > 0.2)
     {
-        service_output = srv.response.output;
-        height_result_pub_.publish(service_output);
-        ROS_DEBUG_STREAM("Service returned image of size " << service_output.height << " x " << service_output.width);
-    }
-    else
-    {
-        ROS_ERROR("Failed to call flattening service");
-        return;
-    }
+        /*
+        Header header        # Header timestamp should be acquisition time of image
+                            # Header frame_id should be optical frame of camera
+                            # origin of frame should be optical center of camera
+                            # +x should point to the right in the image
+                            # +y should point down in the image
+                            # +z should point into to plane of the image
+                            # If the frame_id here and the frame_id of the CameraInfo
+                            # message associated with the image conflict
+                            # the behavior is undefined
 
-    uint8_t min_img_z = std::numeric_limits<uint8_t>::max();
-    for (auto const & it : service_output.data)
-    {
-        if (it < image_height_base)
-            continue;
-        min_img_z = std::min(it, min_img_z);
-    }
+        uint32 height         # image height, that is, number of rows
+        uint32 width          # image width, that is, number of columns
 
-    ROS_DEBUG_STREAM("Minimal Value in image above " << image_height_base << " is: " << +min_img_z);
+        # The legal values for encoding are in file src/image_encodings.cpp
+        # If you want to standardize a new string format, join
+        # ros-users@lists.sourceforge.net and send an email proposing a new encoding.
 
-    for (uint32_t image_y = 0; image_y < service_output.height; ++image_y)
-    {
-        for (uint32_t image_x = 0; image_x < service_output.width; ++image_x)
+        string encoding       # Encoding of pixels -- channel meaning, ordering, size
+                            # taken from the list of strings in include/sensor_msgs/image_encodings.h
+
+        uint8 is_bigendian    # is this data bigendian?
+        uint32 step           # Full row length in bytes
+        uint8[] data          # actual matrix data, size is (step * rows)
+        */
+        sensor_msgs::Image service_input;
+        service_input.header = octomap_msg->header;
+        service_input.height = image_height;
+        service_input.width = image_width;
+        service_input.encoding = sensor_msgs::image_encodings::MONO8;
+        service_input.is_bigendian = 0;
+        service_input.step = image_width;
+        service_input.data.assign(data.begin(), data.end());
+        height_image_pub_.publish(service_input);
+
+
+        // Send height_image to the service and get the new_image
+        floor_octomap::OctoImage srv;
+
+        srv.request.input = service_input;
+        sensor_msgs::Image service_output;
+        if (cluster_service_.call(srv))
         {
-            float x_coord = ((int)image_x + start_x + 0.5) * resolution;
-            float y_coord = ((int)image_y + start_y + 0.5) * resolution;
-            int image_idx = image_y * service_output.step + image_x;
-            uint8_t image_z = service_output.data[image_idx];
+            service_output = srv.response.output;
+            height_result_pub_.publish(service_output);
+            ROS_DEBUG_STREAM("Service returned image of size " << service_output.height << " x " << service_output.width);
+        }
+        else
+        {
+            ROS_ERROR("Failed to call flattening service");
+            return;
+        }
 
-            if (image_z < image_height_base)
+        uint8_t min_img_z = std::numeric_limits<uint8_t>::max();
+        for (auto const & it : service_output.data)
+        {
+            if (it < image_height_base)
                 continue;
+            min_img_z = std::min(it, min_img_z);
+        }
 
-            bool is_edge = false;
+        ROS_DEBUG_STREAM("Minimal Value in image above " << image_height_base << " is: " << +min_img_z);
 
-            for (int i = -1; i < 2; i++)
+        for (uint32_t image_y = 0; image_y < service_output.height; ++image_y)
+        {
+            for (uint32_t image_x = 0; image_x < service_output.width; ++image_x)
             {
-                for (int j = -1; j < 2; j++)
+                float x_coord = ((int)image_x + start_x + 0.5) * resolution;
+                float y_coord = ((int)image_y + start_y + 0.5) * resolution;
+                int image_idx = image_y * service_output.step + image_x;
+                uint8_t image_z = service_output.data[image_idx];
+
+                if (image_z < image_height_base)
+                    continue;
+
+                bool is_edge = false;
+
+                for (int i = -1; i < 2; i++)
                 {
-                    int nx = image_x+i;
-                    int ny = image_y+j;
-                    if (nx < 0 || nx >= service_output.width || ny < 0 || ny >= service_output.height) // point is at edge of image
+                    for (int j = -1; j < 2; j++)
                     {
-                        is_edge = true;
-                        break;
+                        int nx = image_x+i;
+                        int ny = image_y+j;
+                        if (nx < 0 || nx >= service_output.width || ny < 0 || ny >= service_output.height) // point is at edge of image
+                        {
+                            is_edge = true;
+                            break;
+                        }
+                        else if (service_output.data[ny * service_output.step + nx] < image_z) // neighbour point is lower than me
+                        {
+                            is_edge = true;
+                            break;
+                        }
                     }
-                    else if (service_output.data[ny * service_output.step + nx] < image_z) // neighbour point is lower than me
+                    if (is_edge)
+                        break;
+                    else
                     {
-                        is_edge = true;
-                        break;
+                        float z_coord = image_to_octomap_height(image_z, image_height_base, start_box.z(), scale);
+                        if (z_coord < min_Z)
+                            continue;
+                        octomap::point3d coord(x_coord, y_coord, z_coord);
+                        m_octomap->updateNode(coord, true, true);
                     }
+                    
                 }
                 if (is_edge)
-                    break;
-                else
                 {
-                    float z_coord = image_to_octomap_height(image_z, image_height_base, start_box.z(), scale);
-                    if (z_coord < min_Z)
-                        continue;
-                    octomap::point3d coord(x_coord, y_coord, z_coord);
-                    m_octomap->updateNode(coord, true, true);
-                }
-                
-            }
-            if (is_edge)
-            {
-                for (uint8_t fill_z = min_img_z; fill_z <= image_z; fill_z += (uint8_t) scale)
-                {
-                    float z_coord = image_to_octomap_height(fill_z, image_height_base, start_box.z(), scale);
-                    
-                    if (z_coord < min_Z)
-                        continue;
-                    
-                    octomap::point3d coord(x_coord, y_coord, z_coord);
-                    /* Fill in octomap */
-                    m_octomap->updateNode(coord, true, true);
+                    for (uint8_t fill_z = min_img_z; fill_z <= image_z; fill_z += (uint8_t) scale)
+                    {
+                        float z_coord = image_to_octomap_height(fill_z, image_height_base, start_box.z(), scale);
+                        
+                        if (z_coord < min_Z)
+                            continue;
+                        
+                        octomap::point3d coord(x_coord, y_coord, z_coord);
+                        /* Fill in octomap */
+                        m_octomap->updateNode(coord, true, true);
+                    }
                 }
             }
         }
+    }
+    else
+    {
+        ROS_INFO_STREAM("Not enough data in the image! Not calling flatten service");
     }
 
     m_octomap->updateInnerOccupancy();
