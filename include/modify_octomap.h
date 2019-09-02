@@ -41,6 +41,8 @@ private:
     ros::NodeHandle nh_private_;
     tf::TransformListener transform_listener_;
 
+    std::string tf_frame_;
+
     /* In */
     message_filters::Subscriber<octomap_msgs::Octomap> octomap_sub_;
     message_filters::Subscriber<nav_msgs::OccupancyGrid> projected_map_sub_;
@@ -59,7 +61,7 @@ private:
     ros::ServiceClient cluster_service_;
 
 public:
-    OctomapModify(ros::NodeHandle &nh, ros::NodeHandle &nh_private);
+    OctomapModify(ros::NodeHandle &nh, ros::NodeHandle &nh_private, std::string tf_frame);
 };
 }
 
