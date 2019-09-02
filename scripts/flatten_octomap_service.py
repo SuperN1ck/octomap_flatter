@@ -36,6 +36,8 @@ def in_hull(p, hull):
 def flatten(img):
     points = []
     h, w = np.shape(img)
+
+    # Add all valid points to "points"
     for i in range(h):
         for j in range(w):
             if not img[i,j] == 0:
@@ -44,7 +46,7 @@ def flatten(img):
     points = np.asarray(points)
     point_list = list(points)
 
-    # RANSAC
+    # Use RANSAC to get ground plane as "gnd_list" and the rest as "obj_list"
     N = len(point_list)
     max_iterations = 100
     goal_inliers = N * 0.3
@@ -68,7 +70,7 @@ def flatten(img):
             obj_img = obj_img.astype(np.uint8)
             obj_img = cv2.bilateralFilter(obj_img,5,75,75)
             for o in obj_list:
-                if obj_img[o[0],o[1]] > gnd_height:
+                if obj_img[o[0],o[1]] > gnd_height + 1:
                     filt_obj_list.append(o)
                 else:
                     gnd_list.append([o[0],o[1],gnd_height])
@@ -144,6 +146,22 @@ def flatten(img):
             img[g[0],g[1]] = gnd_height
     return img
 
+def flatten_2(img):
+    GND_MAX = 46
+    GND_VAL = 44
+    STEP_MIN = 50
+    STEP_MAX = 56
+    STEP_VAL = 56
+    h, w = np.shape(img)
+    for i in range(h):
+        for j in range(w):
+            if not img[i,j] == 0:
+                if img[i,j] <= GND_MAX:
+                    img[i,j] = GND_VAL
+                elif STEP_MIN <= img[i,j] <= STEP_MAX:
+                    img[i,j] = STEP_VAL
+    return img
+
 def call_flatten(req):
     # img = np.array(req.input.data).reshape(req.input.height, req.input.width)
     bridge = CvBridge()
@@ -153,6 +171,7 @@ def call_flatten(req):
         print(e)
 
     new_img = flatten(img)
+    # new_img = flatten_2(img)
     return OctoImageResponse(bridge.cv2_to_imgmsg(new_img, "mono8"))
 
 rospy.init_node('flatten_octomap_server')
