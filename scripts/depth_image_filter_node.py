@@ -12,10 +12,12 @@ from cv_bridge import CvBridge, CvBridgeError
 import sys
 
 class SubThenFilter:
-    def __init__(self, sub_topic, pub_topic):
+    def __init__(self, sub_topic, pub_topic, frame_id):
         self.sub = rospy.Subscriber(sub_topic, Image, self.image_callback, queue_size=1)
         self.pub = rospy.Publisher(pub_topic, Image, queue_size=1)
         self.bridge = CvBridge()
+
+        self.frame_id = frame_id
         
         self.use_median_blur = True
         self.median_blur_size = 5
@@ -117,19 +119,20 @@ class SubThenFilter:
         try:
             msg = self.bridge.cv2_to_imgmsg(cv_image, "passthrough")
             data.data = msg.data
-            data.header.frame_id = "camera_depth_optical_frame_estimate"
+            data.header.frame_id = self.frame_id
             self.pub.publish(data)
         except CvBridgeError as e:
             print(e)
 
 if __name__ == "__main__":
-    if len(sys.argv) == 5:
+    if len(sys.argv) == 6:
         sub_topic = str(sys.argv[1])
         pub_topic = str(sys.argv[2])
+        frame_id = str(sys.argv[3])
 
         rospy.init_node("filter_depth_server")
         rospy.loginfo("Starting filter_depth_server. Subscribed from {}, Publish to {}".format(sub_topic, pub_topic))
-        sf = SubThenFilter(sub_topic, pub_topic)
+        sf = SubThenFilter(sub_topic, pub_topic, frame_id)
         try:
             rospy.spin()
         except KeyboardInterrupt:
