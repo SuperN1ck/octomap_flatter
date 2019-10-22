@@ -27,7 +27,8 @@ Clone the package into the `src/`-directory of the workspace.
 $ git clone https://github.com/SuperN1ck/dvo_slam.git
 $ cd dvo_slam
 $ git checkout kinetic-devel #  Not necessary if already on kinetic branch
-$ catkin_make -j8 --directory ../ -DCMAKE_BUILD_TYPE=Release --pkg dvo_slam
+$ cd ../..
+$ catkin_make -j8 -DCMAKE_BUILD_TYPE=Release --pkg dvo_slam
 ```
 If `g2o` is not installed please look at the readme in https://github.com/SuperN1ck/dvo_slam/tree/kinetic-devel
 ### Installing Floor Octomap
