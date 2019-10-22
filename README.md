@@ -36,21 +36,23 @@ Similarly `floor_octomap` can be installed
 ```
 # in 'src/'
 $ git clone https://github.com/jyp0802/floor_octomap.git
-$ catkin_make -j8 --directory ../ --pkg floor_octomap
+$ cd ..
+$ catkin_make --pkg floor_octomap
 ```
 ### Installing ORB SLAM2
 We use a modified ROS package version of `ORB_SLAM2` which can be found 
 ```
 # in '/src'
 $ git clone https://github.com/jyp0802/singlecamera_orbslam2.git
-$ catkin_make -j8 --directory ../ --pkg singlecamera_orbslam2
+$ cd ..
+$ catkin_make --pkg singlecamera_orbslam2
 ```
 ### Compiling together
 Of course it is also possible to drop the `--pkg`-parameter in order to compile both packages at the same time. It is important though that you make sure to build `dvo_slam` in Release-Mode as otherwise it is really slow.
 
 Source the workspace
 ```
-$ source ../devel/setup.bash
+$ source devel/setup.bash
 ```
 
 ## Running
