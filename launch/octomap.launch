@@ -7,7 +7,7 @@
     <param name="resolution" value="$(arg resolution)" />
     <!-- name of the fixed frame, needs to be "/map" for SLAM -->
     <param name="frame_id" type="string" value="/world" />
-    <param name="sensor_model/max_range" value="2"/>
+    <param name="sensor_model/max_range" value="10"/>
     <!-- <param name="latch" value="true" /> -->
     <!-- max/min height for occupancy map, should be in meters -->
     <param name="pointcloud_max_x" value="100" />

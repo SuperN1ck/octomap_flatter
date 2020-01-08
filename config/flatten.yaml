@@ -11,7 +11,7 @@ box_front: 0.9
 box_back: 0.1
 
 # Height (up) of bounding box from Robot's feet (unit=m)
-box_up: 0.15
+box_up: 0.1
 
 # Depth (down) of bounding box from Robot's feet (unit=m)
 box_down: 0.1

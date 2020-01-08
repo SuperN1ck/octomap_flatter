@@ -2,7 +2,7 @@
     <!-- Launch Octomap Server -->
     <include file="$(find floor_octomap)/launch/octomap.launch">
         <arg name="resolution" value="0.02"/>
-        <arg name="cloud_mapping" value="/voxel_filtered_cloud"/> <!--topic name of pointcloud to make octomap from-->
+        <arg name="cloud_mapping" value="/depth_filtered_cloud"/> <!--topic name of pointcloud to make octomap from-->
     </include>
     <!-- camera/depth/color/points -->
     <!-- camera/depth_registered/points -->
@@ -26,10 +26,10 @@
     <node pkg="rviz" type="rviz" name="rviz" args="-d $(find floor_octomap)/rviz_config.rviz" />
 
     <!-- TF: Initial Camera Position -->
-    <node pkg="tf" type="static_transform_publisher" name="world_to_baselink_tf_pub" args="0.5 0 1.1 0 0 0 1 world base_link 100" /> 
+    <node pkg="tf" type="static_transform_publisher" name="world_to_baselink_tf_pub" args="0.5 0 1.2 0 0 0 1 world base_link_1 100" />
   
     <!-- TF: Initial Camera Angle -->
-    <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args=" 0 0 0 0 0.321 0 0.947 base_link camera_link 100" />
+    <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args=" 0 0 0 0 0.581 0 0.814 base_link_1 camera_link 100" />
     
     <!-- Run DVO SLAM -->
     <node pkg="dvo_ros" type="camera_tracker" name="dvo_slam_node" output="screen">
@@ -44,11 +44,11 @@
 
     <!-- Copy TF -->
     <node pkg="floor_octomap" type="tf_alias_node.py" name="tf_alias" output="screen" 
-            args="/base_link_estimate /camera_depth_optical_frame_estimate /base_link /camera_depth_optical_frame"/> <!--out1, out2, in1, in2 : Copy TF of in1->in2 to out1->out2-->
+            args="/base_link_estimate /camera_depth_optical_frame_estimate /base_link_1 /camera_depth_optical_frame"/> <!--out1, out2, in1, in2 : Copy TF of in1->in2 to out1->out2-->
 
     <!-- Depth Image Filter -->
     <node pkg="floor_octomap" type="depth_image_filter_node.py" name="filter_depth_service" output="screen" 
-            args="/camera/depth/image_rect_raw /filtered_depth_image /camera_depth_optical_frame_estimate"/> <!--input depth image, output depth image, output frame name-->
+            args="/camera/aligned_depth_to_color/image_raw /filtered_depth_image /camera_depth_optical_frame_estimate"/> <!--input depth image, output depth image, output frame name-->
 
     <!-- Depth Image to Pointcloud -->
     <node pkg="nodelet" type="nodelet" name="standalone_nodelet"  args="manager"/>
@@ -57,6 +57,6 @@
             args="load depth_image_proc/point_cloud_xyz standalone_nodelet">
         <remap from="points" to="depth_filtered_cloud"/> <!--output pointcloud-->
         <remap from="image_rect" to="filtered_depth_image"/> <!--input depth image-->
-        <remap from="camera_info" to="camera/depth/camera_info"/>
+        <remap from="camera_info" to="camera/aligned_depth_to_color/camera_info"/>
     </node>
 </launch>
