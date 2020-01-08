@@ -26,9 +26,9 @@ Clone the package into the `src/`-directory of the workspace.
 ```
 $ git clone https://github.com/SuperN1ck/dvo_slam.git
 $ cd dvo_slam
-$ git checkout kinetic-devel #  Not necessary if already on kinetic branch
+$ git checkout kinetic-devel # Not necessary if already on kinetic branch
 $ cd ../..
-$ catkin_make -j8 -DCMAKE_BUILD_TYPE=Release --pkg dvo_slam
+$ catkin_make -j8 -DCMAKE_BUILD_TYPE=Release
 ```
 If `g2o` is not installed please look at the readme in https://github.com/SuperN1ck/dvo_slam/tree/kinetic-devel
 ### Installing Floor Octomap
@@ -39,7 +39,7 @@ $ git clone https://github.com/jyp0802/floor_octomap.git
 $ cd ..
 $ catkin_make --pkg floor_octomap
 ```
-### Installing ORB SLAM2
+### Installing ORB SLAM2 (Doesn't work for now. Use DVO SLAM instead)
 We use a modified ROS package version of `ORB_SLAM2` which can be found 
 ```
 # in '/src'
