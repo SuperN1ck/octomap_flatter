@@ -23,13 +23,16 @@
     </group>
 
     <!-- RVIZ -->
-    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find floor_octomap)/rviz_config.rviz" />
+    <node pkg="rviz" type="rviz" name="rviz" args="-d $(find floor_octomap)/rviz/dvo_rviz_config.rviz" />
 
     <!-- TF: Initial Camera Position -->
-    <node pkg="tf" type="static_transform_publisher" name="world_to_baselink_tf_pub" args="0.5 0 1.2 0 0 0 1 world base_link_1 100" />
+    <node pkg="tf" type="static_transform_publisher" name="world_to_baselink_tf_pub" args="0.5 0 1.35 0 0 0 1 world base_link 100" />
   
+    <!-- TF: Initial Camera Angle HUBO -->
+    <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args="0 0 0 0 0.350 0 0.937 base_link camera_link 100" />
+
     <!-- TF: Initial Camera Angle -->
-    <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args=" 0 0 0 0 0.581 0 0.814 base_link_1 camera_link 100" />
+    <!-- <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args=" 0 0 0 0 0.317 0 0.948 base_link camera_link 100" /> -->
     
     <!-- Run DVO SLAM -->
     <node pkg="dvo_ros" type="camera_tracker" name="dvo_slam_node" output="screen">
@@ -44,7 +47,7 @@
 
     <!-- Copy TF -->
     <node pkg="floor_octomap" type="tf_alias_node.py" name="tf_alias" output="screen" 
-            args="/base_link_estimate /camera_depth_optical_frame_estimate /base_link_1 /camera_depth_optical_frame"/> <!--out1, out2, in1, in2 : Copy TF of in1->in2 to out1->out2-->
+            args="/base_link_estimate /camera_depth_optical_frame_estimate /base_link /camera_depth_optical_frame"/> <!--out1, out2, in1, in2 : Copy TF of in1->in2 to out1->out2-->
 
     <!-- Depth Image Filter -->
     <node pkg="floor_octomap" type="depth_image_filter_node.py" name="filter_depth_service" output="screen" 
