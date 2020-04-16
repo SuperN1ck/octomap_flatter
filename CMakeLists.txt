@@ -134,6 +134,7 @@ include_directories(
 ## Declare a C++ library
 add_library(${PROJECT_NAME}
    src/modify_octomap.cpp
+   src/modify_octomap_0416.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}
@@ -149,6 +150,7 @@ add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EX
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(modify_octomap_node src/modify_octomap_node.cpp)
+add_executable(modify_octomap_0416_node src/modify_octomap_0416_node.cpp)
 add_executable(cloud_voxel_filter_node src/cloud_voxel_filter_node.cpp)
 
 ## Rename C++ executable without prefix
@@ -163,6 +165,7 @@ add_executable(cloud_voxel_filter_node src/cloud_voxel_filter_node.cpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(modify_octomap_node ${PROJECT_NAME})
+target_link_libraries(modify_octomap_0416_node ${PROJECT_NAME})
 target_link_libraries(cloud_voxel_filter_node ${PCL_LIBRARIES} ${catkin_LIBRARIES})
 
 catkin_generate_virtualenv()
@@ -205,6 +208,7 @@ catkin_generate_virtualenv()
 catkin_install_python(
    PROGRAMS
       scripts/flatten_octomap_service.py
+      scripts/flatten_octomap_service_0416.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 #############

@@ -25,11 +25,15 @@
     <!-- RVIZ -->
     <node pkg="rviz" type="rviz" name="rviz" args="-d $(find floor_octomap)/rviz/orb_rviz_config.rviz" />
 
-    <!-- TF: Initial Camera Position -->
-    <node pkg="tf" type="static_transform_publisher" name="world_to_baselink_tf_pub" args="0.5 0 1.35 0 0 0 1 world base_link 100" />
-  
-    <!-- TF: Initial Camera Angle -->
-    <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args="0 0 0 0 0.581 0 0.814 base_link camera_start 100" />
+    <!-- original -->
+    <!-- <node pkg="tf" type="static_transform_publisher" name="world_to_baselink_tf_pub" args="0.5 0 1.35 0 0 0 1 world base_link 100" />
+    <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args="0 0 0 0 0.581 0 0.814 base_link camera_start 100" /> -->
+    <!-- steps_camera.bag -->
+    <!-- <node pkg="tf" type="static_transform_publisher" name="world_to_baselink_tf_pub" args="0.5 0 1.13 0 0 0 1 world base_link 100" />
+    <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args="0 0 0 0 0.591 0 0.806 base_link camera_start 100" /> -->
+    <!-- bridge_camera.bag -->
+    <node pkg="tf" type="static_transform_publisher" name="world_to_baselink_tf_pub" args="0.5 0 1.13 0 0 0 1 world base_link 100" />
+    <node pkg="tf" type="static_transform_publisher" name="baselink_to_camera_tf_pub" args="0 0 0 0 0.581 0 0.814 base_link camera_start 100" /> -->
 
     <!-- Run ORB SLAM -->
     <node pkg="singlecamera_orbslam2" type="rgbd_slam_node" name="rgbd_slam" output="screen"
