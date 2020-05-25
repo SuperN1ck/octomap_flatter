@@ -151,6 +151,7 @@ add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EX
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(modify_octomap_node src/modify_octomap_node.cpp)
 add_executable(modify_octomap_0416_node src/modify_octomap_0416_node.cpp)
+add_executable(flatten_pointcloud_node src/flatten_pointcloud_node.cpp)
 add_executable(cloud_voxel_filter_node src/cloud_voxel_filter_node.cpp)
 
 ## Rename C++ executable without prefix
@@ -166,6 +167,7 @@ add_executable(cloud_voxel_filter_node src/cloud_voxel_filter_node.cpp)
 ## Specify libraries to link a library or executable target against
 target_link_libraries(modify_octomap_node ${PROJECT_NAME})
 target_link_libraries(modify_octomap_0416_node ${PROJECT_NAME})
+target_link_libraries(flatten_pointcloud_node ${PROJECT_NAME} ${PCL_LIBRARIES})
 target_link_libraries(cloud_voxel_filter_node ${PCL_LIBRARIES} ${catkin_LIBRARIES})
 
 catkin_generate_virtualenv()

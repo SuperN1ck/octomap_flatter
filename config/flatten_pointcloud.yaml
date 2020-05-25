@@ -1,0 +1,15 @@
+in_points: "/camera/depth_registered/points"
+
+out_ground: "/ground_pointcloud"
+out_steps:  "/steps_pointcloud"
+out_steps_flat: "/steps_flat"
+
+steps_frame: "/camera_color_optical_frame"
+
+# RANSAC
+ransac_dt: 0.005
+
+# Octomap
+out_steps_octomap: "/steps_octomap"
+octomap_frame: "/camera_color_optical_frame"
+octomap_resolution: 0.02
