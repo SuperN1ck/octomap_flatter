@@ -7,7 +7,7 @@ add_compile_options(-std=c++11)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS roscpp octomap_msgs message_filters rospy message_generation std_msgs geometry_msgs tf catkin_virtualenv)
+find_package(catkin REQUIRED COMPONENTS roscpp octomap_msgs message_filters rospy message_generation std_msgs geometry_msgs tf catkin_virtualenv pcl_ros)
 find_package(cmake_modules REQUIRED)
 
 # PCL
@@ -113,7 +113,7 @@ generate_messages(
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES floor_octomap
-#  CATKIN_DEPENDS other_catkin_pkg
+  CATKIN_DEPENDS pcl_ros
 #  DEPENDS system_lib
 )
 
@@ -152,6 +152,7 @@ add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EX
 add_executable(modify_octomap_node src/modify_octomap_node.cpp)
 add_executable(modify_octomap_0416_node src/modify_octomap_0416_node.cpp)
 add_executable(flatten_pointcloud_node src/flatten_pointcloud_node.cpp)
+add_executable(flatten_pointcloud_node_0527 src/flatten_pointcloud_node_0527.cpp)
 add_executable(cloud_voxel_filter_node src/cloud_voxel_filter_node.cpp)
 
 ## Rename C++ executable without prefix
@@ -168,6 +169,7 @@ add_executable(cloud_voxel_filter_node src/cloud_voxel_filter_node.cpp)
 target_link_libraries(modify_octomap_node ${PROJECT_NAME})
 target_link_libraries(modify_octomap_0416_node ${PROJECT_NAME})
 target_link_libraries(flatten_pointcloud_node ${PROJECT_NAME} ${PCL_LIBRARIES})
+target_link_libraries(flatten_pointcloud_node_0527 ${PROJECT_NAME} ${PCL_LIBRARIES})
 target_link_libraries(cloud_voxel_filter_node ${PCL_LIBRARIES} ${catkin_LIBRARIES})
 
 catkin_generate_virtualenv()

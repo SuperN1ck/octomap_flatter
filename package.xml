@@ -61,6 +61,7 @@
   <depend>octomap_msgs</depend>
   <depend>octomap</depend>
   <depend>message_filters</depend>
+  <depend>pcl_ros</depend>  
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>

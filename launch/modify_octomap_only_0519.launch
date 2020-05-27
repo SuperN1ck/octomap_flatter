@@ -7,7 +7,12 @@
     </group>
 
     <!-- Run flatten_pointcloud -->
-    <node pkg="floor_octomap" type="flatten_pointcloud_node" name="flatten_pointcloud_node" output="screen">
+    <!-- <node pkg="floor_octomap" type="flatten_pointcloud_node" name="flatten_pointcloud_node" output="screen">
+        <rosparam command="load" file="$(find floor_octomap)/config/flatten_pointcloud.yaml" />
+    </node> -->
+
+    <!-- Run flatten_pointcloud -->
+    <node pkg="floor_octomap" type="flatten_pointcloud_node_0527" name="flatten_pointcloud_node_0527" output="screen">
         <rosparam command="load" file="$(find floor_octomap)/config/flatten_pointcloud.yaml" />
     </node>
 
