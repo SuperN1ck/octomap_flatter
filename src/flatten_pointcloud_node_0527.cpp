@@ -35,6 +35,8 @@ using namespace std;
 
 ros::Publisher pub_ground, pub_steps, pub_steps_world_flat;
 
+ros::Publisher pub_steps_space_filtered;
+
 string in_points, out_ground, out_steps, out_steps_world_flat;
 string steps_frame;
 
@@ -100,6 +102,23 @@ void cropbox_pointcloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud)
     boxFilter.filter(*cloud);
 }
 
+void cropbox_pointcloud_beforeTF(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud)
+{
+	float minX = -0.5;
+	float maxX = 0.5;
+	float minY = -0.45;
+	float maxY = 2;
+	float minZ = -2.0;
+	float maxZ = 2.0;
+
+
+    pcl::CropBox<pcl::PointXYZRGB> boxFilter;
+    boxFilter.setMin(Eigen::Vector4f(minX, minY, minZ, 1.0));
+    boxFilter.setMax(Eigen::Vector4f(maxX, maxY, maxZ, 1.0));
+    boxFilter.setInputCloud(cloud);
+    boxFilter.filter(*cloud);
+}
+
 void publish_pointcloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud, ros::Publisher* pub, vector<float> color = {-1})
 {
     if (color[0] >= 0)
@@ -115,8 +134,10 @@ void publish_octomap(octomap::OcTree *octree, ros::Publisher* pub)
     octree->toMaxLikelihood();
     octree->prune();
     
+    
     octomap_msgs::Octomap octomap_msg;
-    octomap_msgs::fullMapToMsg(*octree, octomap_msg);
+    //octomap_msgs::fullMapToMsg(*octree, octomap_msg);
+    octomap_msgs::binaryMapToMsg(*octree, octomap_msg);
     octomap_msg.header.frame_id = octomap_frame;
     // octomap_msg.header.stamp = cloud_msg.header.stamp;
     pub->publish(octomap_msg);
@@ -178,7 +199,12 @@ void pointcloud_callback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     /* Downsample pointcloud */
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr whole_cloud_down (new pcl::PointCloud<pcl::PointXYZRGB>);
     downsample_pointcloud(whole_cloud, whole_cloud_down, downsample_size);
-    cout << "Points: " << whole_cloud->points.size() << " -> " << whole_cloud_down->points.size() << endl;
+    //cout << "1. Points: " << whole_cloud->points.size() << " -> " << whole_cloud_down->points.size() << endl;
+    
+    //additional crop box before TF
+   cropbox_pointcloud_beforeTF(whole_cloud_down);
+   //cout << "2. Points: " << whole_cloud_down->points.size() << endl;
+   publish_pointcloud(whole_cloud_down, &pub_steps_space_filtered, {255,0,0});
 
 
     /* Segment major plane */
@@ -298,6 +324,9 @@ int main(int argc, char **argv) {
     pub_ground = nh.advertise<sensor_msgs::PointCloud2>(out_ground, 1);
     pub_steps = nh.advertise<sensor_msgs::PointCloud2>(out_steps, 1);
     pub_steps_world_flat = nh.advertise<sensor_msgs::PointCloud2>(out_steps_world_flat, 1);
+    
+    //crop test
+    pub_steps_space_filtered = nh.advertise<sensor_msgs::PointCloud2>("space_filtered", 1);
 
     pub_octomap = nh.advertise<octomap_msgs::Octomap>(out_steps_octomap, 1);
     pub_octomap_flat = nh.advertise<octomap_msgs::Octomap>(out_steps_octomap_flat, 1);

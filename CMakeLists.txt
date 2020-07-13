@@ -2,12 +2,19 @@ cmake_minimum_required(VERSION 2.8.3)
 project(floor_octomap)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-add_compile_options(-std=c++11)
+set(CMAKE_BUILD_TYPE Release)
+# set(CMAKE_BUILD_TYPE Debug)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(-std=c++11)
+else()
+    add_compile_options(-std=c++11 -O3)
+endif()
+
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS roscpp octomap_msgs message_filters rospy message_generation std_msgs geometry_msgs tf catkin_virtualenv pcl_ros)
+find_package(catkin REQUIRED COMPONENTS roscpp octomap_msgs message_filters rospy message_generation std_msgs geometry_msgs tf pcl_ros)
 find_package(cmake_modules REQUIRED)
 
 # PCL
@@ -172,7 +179,6 @@ target_link_libraries(flatten_pointcloud_node ${PROJECT_NAME} ${PCL_LIBRARIES})
 target_link_libraries(flatten_pointcloud_node_0527 ${PROJECT_NAME} ${PCL_LIBRARIES})
 target_link_libraries(cloud_voxel_filter_node ${PCL_LIBRARIES} ${catkin_LIBRARIES})
 
-catkin_generate_virtualenv()
 
 #############
 ## Install ##
