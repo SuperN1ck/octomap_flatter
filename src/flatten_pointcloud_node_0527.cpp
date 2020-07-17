@@ -94,13 +94,13 @@ void downsample_pointcloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_orig, pc
     voxl_grid_filter.filter (*cloud_new);
 }
 
-void cropbox_pointcloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud, std::vector<float> box_size)
+void cropbox_pointcloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_orig, pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_new, std::vector<float> box_size)
 {
     pcl::CropBox<pcl::PointXYZRGB> boxFilter;
     boxFilter.setMin(Eigen::Vector4f(box_size[0], box_size[2], box_size[4], 1.0));
     boxFilter.setMax(Eigen::Vector4f(box_size[1], box_size[3], box_size[5], 1.0));
-    boxFilter.setInputCloud(cloud);
-    boxFilter.filter(*cloud);
+    boxFilter.setInputCloud(cloud_orig);
+    boxFilter.filter(*cloud_new);
 }
 
 void publish_pointcloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud, ros::Publisher* pub, ros::Time stamp, vector<float> color = {-1})
@@ -186,17 +186,18 @@ void pointcloud_callback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 
 
     /* Crop pointcloud before calculations */
-    cropbox_pointcloud(whole_cloud_down, pre_crop_box);
-    publish_pointcloud(whole_cloud_down, &pub_steps_space_filtered, cloud_msg->header.stamp, {255,0,0});
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr whole_cloud_crop (new pcl::PointCloud<pcl::PointXYZRGB>);
+    cropbox_pointcloud(whole_cloud_down, whole_cloud_crop, pre_crop_box);
+    publish_pointcloud(whole_cloud_crop, &pub_steps_space_filtered, cloud_msg->header.stamp, {255,0,0});
 
 
     /* Segment major plane */
     pcl::PointIndices::Ptr inliers_1 (new pcl::PointIndices ());
     pcl::ModelCoefficients::Ptr coefficients_1 (new pcl::ModelCoefficients ());
-    ransac_pointcloud(whole_cloud_down, inliers_1, coefficients_1, plane_1);
+    ransac_pointcloud(whole_cloud_crop, inliers_1, coefficients_1, plane_1);
 
     pcl::ExtractIndices<pcl::PointXYZRGB> extract;
-    extract.setInputCloud (whole_cloud_down);
+    extract.setInputCloud (whole_cloud_crop);
     extract.setIndices (inliers_1);
     extract.setNegative (true);//false
     extract.filter (*outliers);
@@ -230,15 +231,27 @@ void pointcloud_callback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     /* Create octomap of steps pointcloud */
     
     /* Transform to world frame */
-    tf_listener->waitForTransform(octomap_frame, steps_frame, cloud_msg->header.stamp, ros::Duration(0.02));
+    // tf_listener->waitForTransform(octomap_frame, steps_frame, cloud_msg->header.stamp, ros::Duration(0.2));
+    tf::StampedTransform pointcloud_transform;
+    try
+    {
+        tf_listener->lookupTransform(octomap_frame, steps_frame, cloud_msg->header.stamp, pointcloud_transform);
+    }
+    catch (tf::TransformException &ex)
+    {
+        std::cout << "No TF!" << std::endl;
+        return;
+    }
 
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr steps_world (new pcl::PointCloud<pcl::PointXYZRGB>);
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr steps_world_full (new pcl::PointCloud<pcl::PointXYZRGB>);
     sensor_msgs::PointCloud2 steps_cloud_msg, steps_cloud_world_msg;
     pcl::toROSMsg (*steps, steps_cloud_msg);
-    pcl_ros::transformPointCloud(octomap_frame, steps_cloud_msg, steps_cloud_world_msg, *tf_listener);
-    pcl::fromROSMsg (steps_cloud_world_msg, *steps_world);
+    // pcl_ros::transformPointCloud(octomap_frame, steps_cloud_msg, steps_cloud_world_msg, *tf_listener);
+    pcl_ros::transformPointCloud(octomap_frame, pointcloud_transform, steps_cloud_msg, steps_cloud_world_msg);
+    pcl::fromROSMsg (steps_cloud_world_msg, *steps_world_full);
 
-    cropbox_pointcloud(steps_world, bounding_box);
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr steps_world (new pcl::PointCloud<pcl::PointXYZRGB>);
+    cropbox_pointcloud(steps_world_full, steps_world, bounding_box);
 
 
     /* Without forced flattening */
