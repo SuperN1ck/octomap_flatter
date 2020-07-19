@@ -1,4 +1,5 @@
 in_points: "/points2"
+in_request: "/map_request"
 
 out_ground: "/ground_pointcloud"
 out_steps:  "/steps_pointcloud"
