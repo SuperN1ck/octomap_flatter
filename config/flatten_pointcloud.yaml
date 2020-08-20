@@ -8,6 +8,7 @@ out_steps_tranform: "/steps_tranform"
 out_steps_world_flat: "/steps_world_flat"
 
 steps_frame: "/depth_camera_link"
+base_link_frame: "/base_link"
 
 # RANSAC
 downsample_size: 0.01          # Downsample leaf voxel size. Higher = greater downsampling

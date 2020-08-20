@@ -43,7 +43,7 @@ ros::Publisher pub_ground, pub_steps, pub_steps_world_flat;
 ros::Publisher pub_steps_space_filtered;
 
 string in_points, in_request, out_ground, out_steps, out_steps_world_flat;
-string steps_frame;
+string steps_frame, base_link_frame;
 
 // RANSAC
 float downsample_size;
@@ -58,8 +58,8 @@ string octomap_frame;
 float octomap_resolution;
 ros::Publisher pub_bounding_box;
 string out_bounding_box;
-vector<float> bounding_box;
-vector<float> pre_crop_box;
+vector<double> bounding_box;
+vector<double> pre_crop_box;
 
 octomap::OcTree *octree;
 octomap::OcTree *octree_flat;
@@ -99,7 +99,7 @@ void downsample_pointcloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_orig, pc
     voxl_grid_filter.filter (*cloud_new);
 }
 
-void cropbox_pointcloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_orig, pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_new, std::vector<float> box_size)
+void cropbox_pointcloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_orig, pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_new, std::vector<double> box_size)
 {
     pcl::CropBox<pcl::PointXYZRGB> boxFilter;
     boxFilter.setMin(Eigen::Vector4f(box_size[0], box_size[2], box_size[4], 1.0));
@@ -135,11 +135,11 @@ void publish_octomap(octomap::OcTree *octree, ros::Publisher* pub, ros::Time sta
     counter = 0;
 }
 
-void publish_bounding_box(ros::Time stamp)
+void publish_bounding_box(ros::Time stamp, std::vector<double> bbox)
 {
     visualization_msgs::Marker marker;
     // Set the frame ID and timestamp.  See the TF tutorials for information on these.
-    marker.header.frame_id = octomap_frame;
+    marker.header.frame_id = base_link_frame;
     marker.header.stamp = stamp;
 
     // Set the namespace and id for this marker.  This serves to create a unique ID
@@ -152,18 +152,18 @@ void publish_bounding_box(ros::Time stamp)
 
     // Set the marker action.  Options are ADD, DELETE, and new in ROS Indigo: 3 (DELETEALL)
     marker.action = visualization_msgs::Marker::ADD;
-    marker.pose.position.x = (bounding_box[0] + bounding_box[1]) / 2;
-    marker.pose.position.y = (bounding_box[2] + bounding_box[3]) / 2;
-    marker.pose.position.z = (bounding_box[4] + bounding_box[5]) / 2;
+    marker.pose.position.x = (bbox[0] + bbox[1]) / 2;
+    marker.pose.position.y = (bbox[2] + bbox[3]) / 2;
+    marker.pose.position.z = (bbox[4] + bbox[5]) / 2;
     marker.pose.orientation.x = 0.0;
     marker.pose.orientation.y = 0.0;
     marker.pose.orientation.z = 0.0;
     marker.pose.orientation.w = 1.0;
 
     // Set the scale of the marker -- 1x1x1 here means 1m on a side
-    marker.scale.x = bounding_box[1] - bounding_box[0];
-    marker.scale.y = bounding_box[3] - bounding_box[2];
-    marker.scale.z = bounding_box[5] - bounding_box[4];
+    marker.scale.x = bbox[1] - bbox[0];
+    marker.scale.y = bbox[3] - bbox[2];
+    marker.scale.z = bbox[5] - bbox[4];
 
     // Set the color -- be sure to set alpha to something non-zero!
     marker.color.r = 0.0f;
@@ -184,25 +184,23 @@ void pointcloud_callback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg, cons
 
     pcl::fromROSMsg (*cloud_msg, *whole_cloud);
 
+    /* Crop pointcloud before calculations */
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr whole_cloud_crop (new pcl::PointCloud<pcl::PointXYZRGB>);
+    cropbox_pointcloud(whole_cloud, whole_cloud_crop, pre_crop_box);
 
     /* Downsample pointcloud */
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr whole_cloud_down (new pcl::PointCloud<pcl::PointXYZRGB>);
-    downsample_pointcloud(whole_cloud, whole_cloud_down, downsample_size);
-
-
-    /* Crop pointcloud before calculations */
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr whole_cloud_crop (new pcl::PointCloud<pcl::PointXYZRGB>);
-    cropbox_pointcloud(whole_cloud_down, whole_cloud_crop, pre_crop_box);
-    publish_pointcloud(whole_cloud_crop, &pub_steps_space_filtered, cloud_msg->header.stamp, {255,0,0});
+    downsample_pointcloud(whole_cloud_crop, whole_cloud_down, downsample_size);
+    publish_pointcloud(whole_cloud_down, &pub_steps_space_filtered, cloud_msg->header.stamp, {255,0,0});
 
 
     /* Segment major plane */
     pcl::PointIndices::Ptr inliers_1 (new pcl::PointIndices ());
     pcl::ModelCoefficients::Ptr coefficients_1 (new pcl::ModelCoefficients ());
-    ransac_pointcloud(whole_cloud_crop, inliers_1, coefficients_1, plane_1);
+    ransac_pointcloud(whole_cloud_down, inliers_1, coefficients_1, plane_1);
 
     pcl::ExtractIndices<pcl::PointXYZRGB> extract;
-    extract.setInputCloud (whole_cloud_crop);
+    extract.setInputCloud (whole_cloud_down);
     extract.setIndices (inliers_1);
     extract.setNegative (true);//false
     extract.filter (*outliers);
@@ -238,9 +236,11 @@ void pointcloud_callback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg, cons
     /* Transform to world frame */
     // tf_listener->waitForTransform(octomap_frame, steps_frame, cloud_msg->header.stamp, ros::Duration(0.2));
     tf::StampedTransform pointcloud_transform;
+    tf::StampedTransform map_to_baselink_transform;
     try
     {
         tf_listener->lookupTransform(octomap_frame, steps_frame, cloud_msg->header.stamp, pointcloud_transform);
+        tf_listener->lookupTransform(octomap_frame, base_link_frame, cloud_msg->header.stamp, map_to_baselink_transform);
     }
     catch (tf::TransformException &ex)
     {
@@ -256,7 +256,12 @@ void pointcloud_callback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg, cons
     pcl::fromROSMsg (steps_cloud_world_msg, *steps_world_full);
 
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr steps_world (new pcl::PointCloud<pcl::PointXYZRGB>);
-    cropbox_pointcloud(steps_world_full, steps_world, bounding_box);
+    tf::Vector3 min_point(bounding_box[0], bounding_box[2], bounding_box[4]);
+    tf::Vector3 max_point(bounding_box[1], bounding_box[3], bounding_box[5]);
+    min_point = map_to_baselink_transform * min_point;
+    max_point = map_to_baselink_transform * max_point;
+    std::vector<double> transformed_bounding_box = {min_point[0], max_point[0], min_point[1], max_point[1], min_point[2], max_point[2]};
+    cropbox_pointcloud(steps_world_full, steps_world, transformed_bounding_box);
 
 
     /* Without forced flattening */
@@ -291,8 +296,7 @@ void pointcloud_callback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg, cons
         publish_octomap(octree_flat, &pub_octomap_flat, cloud_msg->header.stamp);
         counter = 0;
     }
-    
-    publish_bounding_box(cloud_msg->header.stamp);
+    publish_bounding_box(cloud_msg->header.stamp, bounding_box);
 }
 
 
@@ -310,6 +314,7 @@ int main(int argc, char **argv) {
     nh_private.getParam("out_steps_world_flat", out_steps_world_flat);
 
     nh_private.getParam("steps_frame", steps_frame);
+    nh_private.getParam("base_link_frame", base_link_frame);
 
     nh_private.getParam("downsample_size", downsample_size);
     nh_private.getParam("ransac_dt", ransac_dt);
