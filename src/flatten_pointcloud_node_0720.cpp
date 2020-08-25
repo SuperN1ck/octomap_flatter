@@ -22,6 +22,8 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/filters/passthrough.h>
 #include <pcl/filters/crop_box.h>
+#include <pcl/filters/crop_hull.h>
+#include <pcl/surface/convex_hull.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/extract_indices.h>
 #include <octomap_msgs/conversions.h>
@@ -45,26 +47,25 @@ ros::Publisher pub_steps_space_filtered;
 string in_points, in_request, out_ground, out_steps, out_steps_world_flat;
 string steps_frame, base_link_frame;
 
+// MODE
+int RUN_MODE;
+
 // RANSAC
 float downsample_size;
 float ransac_dt;
 
 // Octomap
 ros::Publisher pub_octomap;
-ros::Publisher pub_octomap_flat;
-string out_steps_octomap;
-string out_steps_octomap_flat;
+ros::Publisher pub_steppable;
+ros::Publisher pub_obstacle;
+string out_steppable;
+string out_obstacle;
 string octomap_frame;
 float octomap_resolution;
 ros::Publisher pub_bounding_box;
 string out_bounding_box;
 vector<double> bounding_box;
 vector<double> pre_crop_box;
-
-octomap::OcTree *octree;
-octomap::OcTree *octree_flat;
-int counter = 0;
-int octomap_threshold;
 
 // Camera to World transform
 bool tf_ready = false;
@@ -108,6 +109,34 @@ void cropbox_pointcloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_orig, pcl::
     boxFilter.filter(*cloud_new);
 }
 
+void crophull_pointcloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_orig, pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_new, std::vector<Eigen::Vector3d> box_points)
+{
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr box_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr hull_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+    std::vector<pcl::Vertices> hull_polygon;
+    for (int i = 0 ; i < box_points.size() ; i ++)
+    {
+        pcl::PointXYZRGB point;
+        point.x = box_points[i](0);
+        point.y = box_points[i](1);
+        point.z = box_points[i](2);
+        box_cloud->push_back(point);
+    }
+
+    pcl::ConvexHull<pcl::PointXYZRGB> cHull;
+    cHull.setInputCloud(box_cloud);
+    cHull.reconstruct(*hull_cloud, hull_polygon);
+    pcl::CropHull<pcl::PointXYZRGB> cropHullFilter;
+    cropHullFilter.setHullIndices(hull_polygon);
+    cropHullFilter.setHullCloud(hull_cloud);
+    cropHullFilter.setDim(3);
+    cropHullFilter.setCropOutside(true);
+
+    cropHullFilter.setInputCloud(cloud_orig);
+    cropHullFilter.filter(*cloud_new);
+
+}
+
 void publish_pointcloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud, ros::Publisher* pub, ros::Time stamp, vector<float> color = {-1})
 {
     if (color[0] >= 0)
@@ -125,57 +154,41 @@ void publish_octomap(octomap::OcTree *octree, ros::Publisher* pub, ros::Time sta
     octree->prune();
     
     octomap_msgs::Octomap octomap_msg;
-    //octomap_msgs::fullMapToMsg(*octree, octomap_msg);
     octomap_msgs::binaryMapToMsg(*octree, octomap_msg);
     octomap_msg.header.frame_id = octomap_frame;
     octomap_msg.header.stamp = stamp;
     pub->publish(octomap_msg);
     delete octree;
-
-    counter = 0;
 }
 
-void publish_bounding_box(ros::Time stamp, std::vector<double> bbox)
+void publish_bounding_box(ros::Time stamp, std::vector<Eigen::Vector3d> box_points)
 {
     visualization_msgs::Marker marker;
-    // Set the frame ID and timestamp.  See the TF tutorials for information on these.
-    marker.header.frame_id = base_link_frame;
+    marker.header.frame_id = octomap_frame;
     marker.header.stamp = stamp;
-
-    // Set the namespace and id for this marker.  This serves to create a unique ID
-    // Any marker sent with the same namespace and id will overwrite the old one
-    marker.ns = "floor_octomap vizualization";
+    marker.ns = "base_link bbox";
     marker.id = 0;
+    marker.type = visualization_msgs::Marker::LINE_LIST;
 
-    // Set the marker type.  Initially this is CUBE, and cycles between that and SPHERE, ARROW, and CYLINDER
-    marker.type = visualization_msgs::Marker::CUBE;
-
-    // Set the marker action.  Options are ADD, DELETE, and new in ROS Indigo: 3 (DELETEALL)
     marker.action = visualization_msgs::Marker::ADD;
-    marker.pose.position.x = (bbox[0] + bbox[1]) / 2;
-    marker.pose.position.y = (bbox[2] + bbox[3]) / 2;
-    marker.pose.position.z = (bbox[4] + bbox[5]) / 2;
-    marker.pose.orientation.x = 0.0;
-    marker.pose.orientation.y = 0.0;
-    marker.pose.orientation.z = 0.0;
-    marker.pose.orientation.w = 1.0;
-
-    // Set the scale of the marker -- 1x1x1 here means 1m on a side
-    marker.scale.x = bbox[1] - bbox[0];
-    marker.scale.y = bbox[3] - bbox[2];
-    marker.scale.z = bbox[5] - bbox[4];
-
-    // Set the color -- be sure to set alpha to something non-zero!
-    marker.color.r = 0.0f;
-    marker.color.g = 1.0f;
-    marker.color.b = 0.0f;
-    marker.color.a = 0.2;
-    marker.lifetime = ros::Duration();
-
+    marker.scale.x = 0.01;
+    marker.color.r = 0;
+    marker.color.g = 0;
+    marker.color.b = 1;
+    marker.color.a = 0.3;
+    std::vector <int> loop {0, 1, 1, 2, 2, 3, 3, 0, 0, 6, 1, 7, 3, 5, 2, 4, 4, 5, 5, 6, 6, 7, 7, 4};
+    for (int i = 0 ; i < loop.size() ; i ++)
+    {
+        geometry_msgs::Point p;
+        p.x = box_points[loop[i]](0);
+        p.y = box_points[loop[i]](1);
+        p.z = box_points[loop[i]](2);
+        marker.points.push_back(p);
+    }
     pub_bounding_box.publish(marker);
 }
 
-void pointcloud_callback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg, const floor_octomap::StampedString::ConstPtr& req_msg)
+void bridge_callback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 {
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr whole_cloud (new pcl::PointCloud<pcl::PointXYZRGB>),
                                         plane_1 (new pcl::PointCloud<pcl::PointXYZRGB>),
@@ -215,15 +228,8 @@ void pointcloud_callback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg, cons
     /* Assign ground and steps plane */
     float c_1 = coefficients_1->values[2]/coefficients_1->values[3];
     float c_2 = coefficients_2->values[2]/coefficients_2->values[3];
-
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr ground = c_1 > c_2 ? plane_1 : plane_2;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr steps = c_1 > c_2 ? plane_2 : plane_1;
-    pcl::ModelCoefficients::Ptr step_coefficients = c_1 > c_2 ? coefficients_2 : coefficients_1;
-
-    float a = step_coefficients->values[0];
-    float b = step_coefficients->values[1];
-    float c = step_coefficients->values[2];
-    float d = step_coefficients->values[3];
 
 
     /* Publish both pointclouds */
@@ -231,10 +237,7 @@ void pointcloud_callback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg, cons
     publish_pointcloud(steps, &pub_steps, cloud_msg->header.stamp, {0,0,255});
 
 
-    /* Create octomap of steps pointcloud */
-    
-    /* Transform to world frame */
-    // tf_listener->waitForTransform(octomap_frame, steps_frame, cloud_msg->header.stamp, ros::Duration(0.2));
+    /* Get tf */
     tf::StampedTransform pointcloud_transform;
     tf::StampedTransform map_to_baselink_transform;
     try
@@ -248,55 +251,220 @@ void pointcloud_callback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg, cons
         return;
     }
 
+
+    /* Transform pointcloud */
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr steps_world_full (new pcl::PointCloud<pcl::PointXYZRGB>);
     sensor_msgs::PointCloud2 steps_cloud_msg, steps_cloud_world_msg;
     pcl::toROSMsg (*steps, steps_cloud_msg);
-    // pcl_ros::transformPointCloud(octomap_frame, steps_cloud_msg, steps_cloud_world_msg, *tf_listener);
     pcl_ros::transformPointCloud(octomap_frame, pointcloud_transform, steps_cloud_msg, steps_cloud_world_msg);
     pcl::fromROSMsg (steps_cloud_world_msg, *steps_world_full);
 
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr steps_world (new pcl::PointCloud<pcl::PointXYZRGB>);
+
+    /* Transform bounding box */
+    double tx = map_to_baselink_transform.getOrigin().getX();
+    double ty = map_to_baselink_transform.getOrigin().getY();
+    tf::Matrix3x3 m(map_to_baselink_transform.getRotation());
+    double rr, rp, ry;
+    m.getRPY(rr, rp, ry);
+    tf::Transform bbox_transform;
+    bbox_transform.setOrigin(tf::Vector3(tx, ty, 0));
+    bbox_transform.setRotation(tf::createQuaternionFromRPY(rr, 0, ry));
+    
     tf::Vector3 min_point(bounding_box[0], bounding_box[2], bounding_box[4]);
     tf::Vector3 max_point(bounding_box[1], bounding_box[3], bounding_box[5]);
-    min_point = map_to_baselink_transform * min_point;
-    max_point = map_to_baselink_transform * max_point;
-    std::vector<double> transformed_bounding_box = {min_point[0], max_point[0], min_point[1], max_point[1], min_point[2], max_point[2]};
-    cropbox_pointcloud(steps_world_full, steps_world, transformed_bounding_box);
+    tf::Vector3 xyz_size = max_point - min_point;
+    std::vector<tf::Vector3> box_points_tf;
+    box_points_tf.push_back(min_point);
+    min_point[0] += xyz_size[0];
+    box_points_tf.push_back(min_point);
+    min_point[1] += xyz_size[1];
+    box_points_tf.push_back(min_point);
+    min_point[0] -= xyz_size[0];
+    box_points_tf.push_back(min_point);
+    box_points_tf.push_back(max_point);
+    max_point[0] -= xyz_size[0];
+    box_points_tf.push_back(max_point);
+    max_point[1] -= xyz_size[1];
+    box_points_tf.push_back(max_point);
+    max_point[0] += xyz_size[0];
+    box_points_tf.push_back(max_point);
 
-
-    /* Without forced flattening */
-    if (counter == 0)
-        octree = new octomap::OcTree(octomap_resolution);
-
-    for(pcl::PointCloud<pcl::PointXYZRGB>::iterator it = steps_world->begin(); it != steps_world->end(); it++)
+    std::vector<Eigen::Vector3d> transformed_bbox_points;
+    for (int i=0; i<box_points_tf.size(); i++)
     {
-        octomap::point3d coord(it->x, it->y, it->z);
-        octree->updateNode(coord, true, true);
+        tf::Vector3 point_tf = bbox_transform*box_points_tf[i];
+        Eigen::Vector3d point (point_tf[0], point_tf[1], point_tf[2]);
+        transformed_bbox_points.push_back(point);
     }
+    publish_bounding_box(cloud_msg->header.stamp, transformed_bbox_points);
 
 
-    /* With forced flattening */
+    /* Crop pointcloud by bounding box */
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr steps_world (new pcl::PointCloud<pcl::PointXYZRGB>);
+    crophull_pointcloud(steps_world_full, steps_world, transformed_bbox_points);
+
+
+    /* Flatten and publish octomap */
     for(pcl::PointCloud<pcl::PointXYZRGB>::iterator it = steps_world->begin(); it != steps_world->end(); it++)
         it->z = 0;
-
     publish_pointcloud(steps_world, &pub_steps_world_flat, cloud_msg->header.stamp, {100,0,200});
 
-    if (counter == 0)
-        octree_flat = new octomap::OcTree(octomap_resolution);
-
+    octomap::OcTree *octree_steppable = new octomap::OcTree(octomap_resolution);
     for(pcl::PointCloud<pcl::PointXYZRGB>::iterator it = steps_world->begin(); it != steps_world->end(); it++)
     {
         octomap::point3d coord(it->x, it->y, it->z);
-        octree_flat->updateNode(coord, true, true);
+        octree_steppable->updateNode(coord, true, true);
+    }
+    publish_octomap(octree_steppable, &pub_steppable, cloud_msg->header.stamp);
+}
+
+void obstacle_callback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
+{
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr whole_cloud (new pcl::PointCloud<pcl::PointXYZRGB>),
+                                        steppable (new pcl::PointCloud<pcl::PointXYZRGB>),
+                                        obstacles (new pcl::PointCloud<pcl::PointXYZRGB>);
+
+    pcl::fromROSMsg (*cloud_msg, *whole_cloud);
+
+    /* Crop pointcloud before calculations */
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr whole_cloud_crop (new pcl::PointCloud<pcl::PointXYZRGB>);
+    cropbox_pointcloud(whole_cloud, whole_cloud_crop, pre_crop_box);
+
+    /* Downsample pointcloud */
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr whole_cloud_down (new pcl::PointCloud<pcl::PointXYZRGB>);
+    downsample_pointcloud(whole_cloud_crop, whole_cloud_down, downsample_size);
+    publish_pointcloud(whole_cloud_down, &pub_steps_space_filtered, cloud_msg->header.stamp, {255,0,0});
+
+
+    /* Segment major plane */
+    pcl::PointIndices::Ptr inliers (new pcl::PointIndices ());
+    pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
+    ransac_pointcloud(whole_cloud_down, inliers, coefficients, steppable);
+
+    pcl::ExtractIndices<pcl::PointXYZRGB> extract;
+    extract.setInputCloud (whole_cloud_down);
+    extract.setIndices (inliers);
+    extract.setNegative (true);//false
+    extract.filter (*obstacles);
+
+
+    /* Publish both pointclouds */
+    publish_pointcloud(obstacles, &pub_ground, cloud_msg->header.stamp, {255,0,0});
+    publish_pointcloud(steppable, &pub_steps, cloud_msg->header.stamp, {0,0,255});
+
+    
+    /* Get tf */
+    tf::StampedTransform pointcloud_transform;
+    tf::StampedTransform map_to_baselink_transform;
+    try
+    {
+        tf_listener->lookupTransform(octomap_frame, steps_frame, cloud_msg->header.stamp, pointcloud_transform);
+        tf_listener->lookupTransform(octomap_frame, base_link_frame, cloud_msg->header.stamp, map_to_baselink_transform);
+    }
+    catch (tf::TransformException &ex)
+    {
+        std::cout << "No TF!" << std::endl;
+        return;
     }
 
-    if (++counter == octomap_threshold)
+
+    /* Transform bounding box */
+    double tx = map_to_baselink_transform.getOrigin().getX();
+    double ty = map_to_baselink_transform.getOrigin().getY();
+    tf::Matrix3x3 m(map_to_baselink_transform.getRotation());
+    double rr, rp, ry;
+    m.getRPY(rr, rp, ry);
+    tf::Transform bbox_transform;
+    bbox_transform.setOrigin(tf::Vector3(tx, ty, 0));
+    bbox_transform.setRotation(tf::createQuaternionFromRPY(rr, 0, ry));
+    
+    tf::Vector3 min_point(bounding_box[0], bounding_box[2], bounding_box[4]);
+    tf::Vector3 max_point(bounding_box[1], bounding_box[3], bounding_box[5]);
+    tf::Vector3 xyz_size = max_point - min_point;
+    std::vector<tf::Vector3> box_points_tf;
+    box_points_tf.push_back(min_point);
+    min_point[0] += xyz_size[0];
+    box_points_tf.push_back(min_point);
+    min_point[1] += xyz_size[1];
+    box_points_tf.push_back(min_point);
+    min_point[0] -= xyz_size[0];
+    box_points_tf.push_back(min_point);
+    box_points_tf.push_back(max_point);
+    max_point[0] -= xyz_size[0];
+    box_points_tf.push_back(max_point);
+    max_point[1] -= xyz_size[1];
+    box_points_tf.push_back(max_point);
+    max_point[0] += xyz_size[0];
+    box_points_tf.push_back(max_point);
+
+    std::vector<Eigen::Vector3d> transformed_bbox_points;
+    for (int i=0; i<box_points_tf.size(); i++)
     {
-        publish_octomap(octree, &pub_octomap, cloud_msg->header.stamp);
-        publish_octomap(octree_flat, &pub_octomap_flat, cloud_msg->header.stamp);
-        counter = 0;
+        tf::Vector3 point_tf = bbox_transform*box_points_tf[i];
+        Eigen::Vector3d point (point_tf[0], point_tf[1], point_tf[2]);
+        transformed_bbox_points.push_back(point);
     }
-    publish_bounding_box(cloud_msg->header.stamp, bounding_box);
+    publish_bounding_box(cloud_msg->header.stamp, transformed_bbox_points);
+
+
+    /* Transform obstacle pointcloud */
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstacle_world_full (new pcl::PointCloud<pcl::PointXYZRGB>);
+    sensor_msgs::PointCloud2 obstacle_cloud_msg, obstacle_cloud_world_msg;
+    pcl::toROSMsg (*obstacles, obstacle_cloud_msg);
+    pcl_ros::transformPointCloud(octomap_frame, pointcloud_transform, obstacle_cloud_msg, obstacle_cloud_world_msg);
+    pcl::fromROSMsg (obstacle_cloud_world_msg, *obstacle_world_full);
+
+
+    /* Crop obstacle pointcloud by bounding box */
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstacle_world (new pcl::PointCloud<pcl::PointXYZRGB>);
+    crophull_pointcloud(obstacle_world_full, obstacle_world, transformed_bbox_points);
+
+
+    /* Create and publish octomap */
+    octomap::OcTree *octree_obstacle = new octomap::OcTree(octomap_resolution);
+    for(pcl::PointCloud<pcl::PointXYZRGB>::iterator it = obstacle_world->begin(); it != obstacle_world->end(); it++)
+    {
+        octomap::point3d coord(it->x, it->y, it->z);
+        octree_obstacle->updateNode(coord, true, true);
+    }
+    publish_octomap(octree_obstacle, &pub_obstacle, cloud_msg->header.stamp);
+
+
+    /* Transform steppable pointcloud */
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr steps_world_full (new pcl::PointCloud<pcl::PointXYZRGB>);
+    sensor_msgs::PointCloud2 steps_cloud_msg, steps_cloud_world_msg;
+    pcl::toROSMsg (*steppable, steps_cloud_msg);
+    pcl_ros::transformPointCloud(octomap_frame, pointcloud_transform, steps_cloud_msg, steps_cloud_world_msg);
+    pcl::fromROSMsg (steps_cloud_world_msg, *steps_world_full);
+
+
+    /* Crop pointcloud by bounding box */
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr steps_world (new pcl::PointCloud<pcl::PointXYZRGB>);
+    crophull_pointcloud(steps_world_full, steps_world, transformed_bbox_points);
+
+
+    /* Flatten and publish octomap */
+    for(pcl::PointCloud<pcl::PointXYZRGB>::iterator it = steps_world->begin(); it != steps_world->end(); it++)
+        it->z = 0;
+    publish_pointcloud(steps_world, &pub_steps_world_flat, cloud_msg->header.stamp, {100,0,200});
+
+    octomap::OcTree *octree_steppable = new octomap::OcTree(octomap_resolution);
+    for(pcl::PointCloud<pcl::PointXYZRGB>::iterator it = steps_world->begin(); it != steps_world->end(); it++)
+    {
+        octomap::point3d coord(it->x, it->y, it->z);
+        octree_steppable->updateNode(coord, true, true);
+    }
+    publish_octomap(octree_steppable, &pub_steppable, cloud_msg->header.stamp);
+}
+
+void callback_branch(const sensor_msgs::PointCloud2ConstPtr& cloud_msg, const floor_octomap::StampedString::ConstPtr& req_msg)
+{
+    if (RUN_MODE == 1)
+        bridge_callback(cloud_msg);
+    else if (RUN_MODE == 2)
+        obstacle_callback(cloud_msg);
+    else
+        std::cout << "ERROR: RUN_MODE must be either 1 or 2. Currently set to " << RUN_MODE << std::endl;
 }
 
 
@@ -319,17 +487,15 @@ int main(int argc, char **argv) {
     nh_private.getParam("downsample_size", downsample_size);
     nh_private.getParam("ransac_dt", ransac_dt);
 
-    nh_private.getParam("out_steps_octomap", out_steps_octomap);
-    nh_private.getParam("out_steps_octomap_flat", out_steps_octomap_flat);
+    nh_private.getParam("out_steppable", out_steppable);
+    nh_private.getParam("out_obstacle", out_obstacle);
     nh_private.getParam("octomap_frame", octomap_frame);
     nh_private.getParam("octomap_resolution", octomap_resolution);
     nh_private.getParam("out_bounding_box", out_bounding_box);
     nh_private.getParam("bounding_box", bounding_box);
     nh_private.getParam("pre_crop_box", pre_crop_box);
-    nh_private.getParam("octomap_threshold", octomap_threshold);
 
-    // ros::Subscriber sub_points = nh.subscribe(in_points, 1, pointcloud_callback);
-    // ros::Subscriber sub_request = nh.subscribe(in_request, 1, pointcloud_callback);
+    nh_private.getParam("RUN_MODE", RUN_MODE);
 
     message_filters::Subscriber<sensor_msgs::PointCloud2> sub_points (nh, in_points, 10);
     message_filters::Subscriber<floor_octomap::StampedString> sub_request (nh, in_request, 10);
@@ -338,10 +504,7 @@ int main(int argc, char **argv) {
     typedef message_filters::Synchronizer<MySyncPolicy> Sync;
     boost::shared_ptr<Sync> sync_;
     sync_.reset(new Sync(MySyncPolicy(10), sub_points, sub_request));
-    sync_->registerCallback(boost::bind(pointcloud_callback, _1, _2));
-
-    // message_filters::TimeSynchronizer<sensor_msgs::PointCloud2, floor_octomap::StampedString> sync(sub_points, sub_request, 10);
-    // sync.registerCallback(boost::bind(pointcloud_callback, _1, _2));
+    sync_->registerCallback(boost::bind(callback_branch, _1, _2));
 
     pub_ground = nh.advertise<sensor_msgs::PointCloud2>(out_ground, 1);
     pub_steps = nh.advertise<sensor_msgs::PointCloud2>(out_steps, 1);
@@ -350,8 +513,8 @@ int main(int argc, char **argv) {
     //crop test
     pub_steps_space_filtered = nh.advertise<sensor_msgs::PointCloud2>("space_filtered", 1);
 
-    pub_octomap = nh.advertise<octomap_msgs::Octomap>(out_steps_octomap, 1);
-    pub_octomap_flat = nh.advertise<octomap_msgs::Octomap>(out_steps_octomap_flat, 1);
+    pub_steppable = nh.advertise<octomap_msgs::Octomap>(out_steppable, 1);
+    pub_obstacle = nh.advertise<octomap_msgs::Octomap>(out_obstacle, 1);
     pub_bounding_box = nh.advertise<visualization_msgs::Marker>(out_bounding_box, 1);
 
     tf_listener = new tf::TransformListener();
