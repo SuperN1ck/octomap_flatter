@@ -142,8 +142,9 @@ void publish_pointcloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud, ros::Publi
     if (color[0] >= 0)
         change_pointcloud_color(cloud, color);
     sensor_msgs::PointCloud2 cloud_msg;
-    cloud_msg.header.stamp = stamp;
     pcl::toROSMsg (*cloud, cloud_msg);
+    cloud_msg.header.stamp = stamp;
+    cloud_msg.header.frame_id = steps_frame;
     pub->publish(cloud_msg);
 }
 
@@ -322,13 +323,16 @@ void obstacle_callback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 {
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr whole_cloud (new pcl::PointCloud<pcl::PointXYZRGB>),
                                         steppable (new pcl::PointCloud<pcl::PointXYZRGB>),
-                                        obstacles (new pcl::PointCloud<pcl::PointXYZRGB>);
+                                        obstacles (new pcl::PointCloud<pcl::PointXYZRGB>),
+                                        temp_plane (new pcl::PointCloud<pcl::PointXYZRGB>),
+                                        temp_other (new pcl::PointCloud<pcl::PointXYZRGB>);
 
     pcl::fromROSMsg (*cloud_msg, *whole_cloud);
 
     /* Crop pointcloud before calculations */
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr whole_cloud_crop (new pcl::PointCloud<pcl::PointXYZRGB>);
     cropbox_pointcloud(whole_cloud, whole_cloud_crop, pre_crop_box);
+
 
     /* Downsample pointcloud */
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr whole_cloud_down (new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -339,13 +343,42 @@ void obstacle_callback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     /* Segment major plane */
     pcl::PointIndices::Ptr inliers (new pcl::PointIndices ());
     pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
-    ransac_pointcloud(whole_cloud_down, inliers, coefficients, steppable);
+    ransac_pointcloud(whole_cloud_down, inliers, coefficients, temp_plane);
 
     pcl::ExtractIndices<pcl::PointXYZRGB> extract;
     extract.setInputCloud (whole_cloud_down);
     extract.setIndices (inliers);
-    extract.setNegative (true);//false
-    extract.filter (*obstacles);
+    extract.setNegative (true);
+    extract.filter (*temp_other);
+
+    float a = coefficients->values[0];
+    float b = coefficients->values[1];
+    float c = coefficients->values[2];
+    float d = coefficients->values[3];
+
+    while (a < -0.1)
+    {
+        // std::cout << a << "\t" << b << "\t" << c << "\t" << d << std::endl;
+        *obstacles += *temp_plane;
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr new_temp_other (new pcl::PointCloud<pcl::PointXYZRGB>);
+        pcl::PointIndices::Ptr new_inliers (new pcl::PointIndices ());
+        pcl::ModelCoefficients::Ptr new_coefficients (new pcl::ModelCoefficients ());
+        ransac_pointcloud(temp_other, new_inliers, new_coefficients, temp_plane);
+
+        pcl::ExtractIndices<pcl::PointXYZRGB> extract;
+        extract.setInputCloud (temp_other);
+        extract.setIndices (new_inliers);
+        extract.setNegative (true);
+        extract.filter (*new_temp_other);
+
+        temp_other = new_temp_other;
+        a = new_coefficients->values[0];
+    }
+    // std::cout << a << "\t" << b << "\t" << c << "\t" << d << std::endl;
+    // std::cout << "------------------" << std::endl;
+
+    steppable = temp_plane;
+    *obstacles += *temp_other;
 
 
     /* Publish both pointclouds */
