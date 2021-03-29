@@ -66,6 +66,7 @@ ros::Publisher pub_bounding_box;
 string out_bounding_box;
 vector<double> bounding_box;
 vector<double> pre_crop_box;
+vector<double> legs_crop_box;
 float obstacle_plane_height;
 
 // Camera to World transform
@@ -136,6 +137,36 @@ void crophull_pointcloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_orig, pcl:
     cropHullFilter.setInputCloud(cloud_orig);
     cropHullFilter.filter(*cloud_new);
 
+}
+
+void crop_remove_pointcloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_orig, pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_new, pcl::PointCloud<pcl::PointXYZRGB>::Ptr under_feet, std::vector<Eigen::Vector3d> box_points)
+{
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr box_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr hull_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+    std::vector<pcl::Vertices> hull_polygon;
+    for (int i = 0 ; i < box_points.size() ; i ++)
+    {
+        pcl::PointXYZRGB point;
+        point.x = box_points[i](0);
+        point.y = box_points[i](1);
+        point.z = box_points[i](2);
+        box_cloud->push_back(point);
+    }
+
+    pcl::ConvexHull<pcl::PointXYZRGB> cHull;
+    cHull.setInputCloud(box_cloud);
+    cHull.reconstruct(*hull_cloud, hull_polygon);
+    pcl::CropHull<pcl::PointXYZRGB> cropHullFilter;
+    cropHullFilter.setHullIndices(hull_polygon);
+    cropHullFilter.setHullCloud(hull_cloud);
+    cropHullFilter.setDim(3);
+    cropHullFilter.setCropOutside(false);
+
+    cropHullFilter.setInputCloud(cloud_orig);
+    cropHullFilter.filter(*cloud_new);
+
+    cropHullFilter.setCropOutside(true);
+    cropHullFilter.filter(*under_feet);
 }
 
 void publish_pointcloud(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud, ros::Publisher* pub, ros::Time stamp, string frame, vector<float> color = {-1})
@@ -487,10 +518,57 @@ void obstacle_callback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
     crophull_pointcloud(obstacles, obstacle_world, transformed_bbox_points);
 
 
+    /* Transform bounding box */
+    double leg_tx = map_to_baselink_transform.getOrigin().getX();
+    double leg_ty = map_to_baselink_transform.getOrigin().getY();
+    tf::Matrix3x3 leg_m(map_to_baselink_transform.getRotation());
+    double leg_rr, leg_rp, leg_ry;
+    leg_m.getRPY(leg_rr, leg_rp, leg_ry);
+    tf::Transform leg_box_transform;
+    leg_box_transform.setOrigin(tf::Vector3(leg_tx, leg_ty, 0));
+    leg_box_transform.setRotation(tf::createQuaternionFromRPY(leg_rr, 0, leg_ry));
+
+    tf::Vector3 min_leg_point(legs_crop_box[0], legs_crop_box[2], legs_crop_box[4]);
+    tf::Vector3 max_leg_point(legs_crop_box[1], legs_crop_box[3], legs_crop_box[5]);
+    tf::Vector3 leg_xyz_size = max_leg_point - min_leg_point;
+    std::vector<tf::Vector3> leg_box_points_tf;
+    leg_box_points_tf.push_back(min_leg_point);
+    min_leg_point[0] += leg_xyz_size[0];
+    leg_box_points_tf.push_back(min_leg_point);
+    min_leg_point[1] += leg_xyz_size[1];
+    leg_box_points_tf.push_back(min_leg_point);
+    min_leg_point[0] -= leg_xyz_size[0];
+    leg_box_points_tf.push_back(min_leg_point);
+    leg_box_points_tf.push_back(max_leg_point);
+    max_leg_point[0] -= leg_xyz_size[0];
+    leg_box_points_tf.push_back(max_leg_point);
+    max_leg_point[1] -= leg_xyz_size[1];
+    leg_box_points_tf.push_back(max_leg_point);
+    max_leg_point[0] += leg_xyz_size[0];
+    leg_box_points_tf.push_back(max_leg_point);
+
+    std::vector<Eigen::Vector3d> transformed_leg_points;
+    for (int i=0; i<leg_box_points_tf.size(); i++)
+    {
+        tf::Vector3 point_tf = leg_box_transform*leg_box_points_tf[i];
+        Eigen::Vector3d point (point_tf[0], point_tf[1], point_tf[2]);
+        transformed_leg_points.push_back(point);
+    }
+    // publish_bounding_box(cloud_msg->header.stamp, transformed_leg_points);
+
+
+    /* Crop obstacle pointcloud to remove legs */
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr obstacle_world_new (new pcl::PointCloud<pcl::PointXYZRGB>);
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr under_feet (new pcl::PointCloud<pcl::PointXYZRGB>);
+    crop_remove_pointcloud(obstacle_world, obstacle_world_new, under_feet, transformed_leg_points);
+
+
     /* Create and publish octomap */
     octomap::OcTree *octree_obstacle = new octomap::OcTree(octomap_resolution);
-    for(pcl::PointCloud<pcl::PointXYZRGB>::iterator it = obstacle_world->begin(); it != obstacle_world->end(); it++)
+    for(pcl::PointCloud<pcl::PointXYZRGB>::iterator it = obstacle_world_new->begin(); it != obstacle_world_new->end(); it++)
     {
+        if (it->z <= 0)
+            continue;
         octomap::point3d coord(it->x, it->y, it->z);
         octree_obstacle->updateNode(coord, true, true);
     }
@@ -498,6 +576,7 @@ void obstacle_callback(const sensor_msgs::PointCloud2ConstPtr& cloud_msg)
 
 
     /* Crop pointcloud by bounding box */
+    *steppable += *under_feet;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr steps_world (new pcl::PointCloud<pcl::PointXYZRGB>);
     crophull_pointcloud(steppable, steps_world, transformed_bbox_points);
 
@@ -553,6 +632,7 @@ int main(int argc, char **argv) {
     nh_private.getParam("out_bounding_box", out_bounding_box);
     nh_private.getParam("bounding_box", bounding_box);
     nh_private.getParam("pre_crop_box", pre_crop_box);
+    nh_private.getParam("legs_crop_box", legs_crop_box);
     nh_private.getParam("obstacle_plane_height", obstacle_plane_height);
 
     nh_private.getParam("RUN_MODE", RUN_MODE);

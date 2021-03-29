@@ -22,6 +22,7 @@ octomap_resolution: 0.05
 out_bounding_box: "/bounding_box_new"
 bounding_box: [-2.0, 0, -0.5, 0.5, -0.2, 0.2]  # min_x, max_x, min_y, max_y, min_z, max_z
 pre_crop_box: [-0.5, 0.5, -0.45, 2, -2.0, 2.0]  # min_x, max_x, min_y, max_y, min_z, max_z
+legs_crop_box: [-0.25, 0.05, -0.35, 0.35, -0.05, 0.2]  # min_x, max_x, min_y, max_y, min_z, max_z
 
 RUN_MODE: 2 # 1 - 징검다리/외나무다리, 2 - 장애물
 
