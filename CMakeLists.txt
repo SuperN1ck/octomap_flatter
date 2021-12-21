@@ -162,6 +162,8 @@ add_executable(modify_octomap_0416_node src/modify_octomap_0416_node.cpp)
 add_executable(flatten_pointcloud_node src/flatten_pointcloud_node.cpp)
 add_executable(flatten_pointcloud_node_0527 src/flatten_pointcloud_node_0527.cpp)
 add_executable(flatten_pointcloud_node_0720 src/flatten_pointcloud_node_0720.cpp)
+add_executable(flatten_pointcloud_node_final src/flatten_pointcloud_node_final.cpp)
+add_executable(flatten_pointcloud_node_slope src/flatten_pointcloud_node_slope.cpp)
 add_executable(cloud_voxel_filter_node src/cloud_voxel_filter_node.cpp)
 
 ## Rename C++ executable without prefix
@@ -180,6 +182,8 @@ target_link_libraries(modify_octomap_0416_node ${PROJECT_NAME})
 target_link_libraries(flatten_pointcloud_node ${PROJECT_NAME} ${PCL_LIBRARIES})
 target_link_libraries(flatten_pointcloud_node_0527 ${PROJECT_NAME} ${PCL_LIBRARIES})
 target_link_libraries(flatten_pointcloud_node_0720 ${PROJECT_NAME} ${PCL_LIBRARIES})
+target_link_libraries(flatten_pointcloud_node_final ${PROJECT_NAME} ${PCL_LIBRARIES})
+target_link_libraries(flatten_pointcloud_node_slope ${PROJECT_NAME} ${PCL_LIBRARIES})
 target_link_libraries(cloud_voxel_filter_node ${PCL_LIBRARIES} ${catkin_LIBRARIES})
 
 

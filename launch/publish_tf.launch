@@ -1,0 +1,7 @@
+<launch>
+    <node pkg="tf" type="static_transform_publisher" name="tf_pub_0" args="0 0 0 0 0 1 0 world map 100" />
+    <node pkg="tf" type="static_transform_publisher" name="tf_pub_1" args="0 0 0.8 0 0 0 1 map camera_odom_frame 100" />
+    <node pkg="tf" type="static_transform_publisher" name="tf_pub_2" args="-0.005 0 -0.035 0 0 0 1 camera_link camera_base 100" />
+    <node pkg="tf" type="static_transform_publisher" name="tf_pub_3" args="0 0 -0.8 0 0 1 0 camera_link base_link 100" />
+
+</launch>

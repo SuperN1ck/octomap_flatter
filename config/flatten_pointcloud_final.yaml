@@ -1,0 +1,41 @@
+in_points: "/points2"
+in_request: "/map_request"
+
+out_ground: "/ground_pointcloud_new"
+out_steps:  "/steps_pointcloud_new"
+out_steps_flat: "/steps_flat_new"
+out_steps_tranform: "/steps_tranform_new"
+out_steps_world_flat: "/steps_world_flat_new"
+
+steps_frame: "/depth_camera_link"
+base_link_frame: "/base_link"
+
+# RANSAC
+downsample_size: 0.02          # Downsample leaf voxel size. Higher = greater downsampling
+ransac_dt: 0.008                # RANSAC distance threshold. Higher = more inclusive
+
+# Octomap
+out_steppable: "/steppable_region"
+out_obstacle: "/environment"
+octomap_frame: "/map"
+octomap_resolution: 0.05
+out_bounding_box: "/bounding_box_new"
+bounding_box: [-0.5, 2.0, -0.5, 0.5, -0.8, 0.8]  # min_x, max_x, min_y, max_y, min_z, max_z
+pre_crop_box: [-0.5, 0.5, -2, 2, -2.0, 2.0]  # min_x, max_x, min_y, max_y, min_z, max_z
+legs_crop_box: [-0.25, 0.05, -0.35, 0.35, -0.05, 0.2]  # min_x, max_x, min_y, max_y, min_z, max_z
+
+MIN_PLANE_ANGLE: 0.9
+MAX_PLANE_HEIGHT: 0.5
+MIN_PLANE_SIZE: 400
+MAX_VERTICAL_ANGLE: 0.1
+MIN_CLUSTER_SIZE: 50
+MIN_PLANE_DENSITY: 0.5
+MAX_PLANE_ANGLE: 10.0
+
+FLATTEN: false
+SOR_MK: 50
+SOR_STDDEV: 2.0
+
+obstacle_plane_height: 0
+
+DEMO: true
